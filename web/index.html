@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WinForge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=4">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9889;</text></svg>">
+</head>
+<body>
+<div class="bg-glow" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <div>
+      <h1>WinForge</h1>
+      <p class="brand-sub">Set up a fresh Windows machine in one pass</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <div class="search-wrap">
+      <input id="search" type="search" placeholder="Search apps, e.g. node, android, docker" autocomplete="off" spellcheck="false">
+      <kbd>/</kbd>
+    </div>
+    <button id="refresh-installed" class="ghost-btn" title="Re-scan what is already installed">Rescan</button>
+  </div>
+</header>
+
+<div id="banner-area"></div>
+
+<main class="layout">
+  <aside class="sidebar">
+    <nav id="category-nav" class="category-nav"></nav>
+    <div class="sidebar-foot">
+      <button id="clear-selection" class="link-btn">Clear selection</button>
+    </div>
+  </aside>
+
+  <section class="content">
+    <div class="presets">
+      <div class="presets-head">
+        <h2>Quick start</h2>
+        <p>Pick a bundle, then adjust anything below.</p>
+      </div>
+      <div id="preset-list" class="preset-list"></div>
+    </div>
+
+    <div id="app-groups" class="app-groups">
+      <div class="loading">Loading catalog...</div>
+    </div>
+  </section>
+</main>
+
+<div id="selection-bar" class="selection-bar" hidden>
+  <div class="selection-info">
+    <strong id="selection-count">0</strong>
+    <span id="selection-label">apps selected</span>
+    <span id="selection-names" class="selection-names"></span>
+  </div>
+  <div class="selection-actions">
+    <button id="configure-btn" class="ghost-btn">Options</button>
+    <button id="install-btn" class="primary-btn">Install</button>
+  </div>
+</div>
+
+<div id="options-modal" class="modal" hidden>
+  <div class="modal-card">
+    <h2>Setup options</h2>
+    <p class="modal-sub">Applied after the matching app finishes installing. All optional.</p>
+
+    <fieldset>
+      <legend>Git identity</legend>
+      <label>Name<input id="opt-git-name" type="text" placeholder="Ada Lovelace" autocomplete="off"></label>
+      <label>Email<input id="opt-git-email" type="email" placeholder="ada@example.com" autocomplete="off"></label>
+      <p class="field-hint">Used for <code>git config --global</code>. Also sets the default branch to <code>main</code> and enables long paths.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>VS Code extensions</legend>
+      <label>Extension ids<textarea id="opt-vscode-ext" rows="3" placeholder="esbenp.prettier-vscode&#10;dbaeumer.vscode-eslint"></textarea></label>
+      <p class="field-hint">One publisher.name per line.</p>
+    </fieldset>
+
+    <div class="modal-actions">
+      <button id="options-close" class="primary-btn">Done</button>
+    </div>
+  </div>
+</div>
+
+<div id="progress-panel" class="progress-panel" hidden>
+  <div class="progress-card">
+    <header class="progress-head">
+      <div>
+        <h2 id="progress-title">Installing</h2>
+        <p id="progress-sub" class="progress-sub">Starting...</p>
+      </div>
+      <button id="progress-close" class="ghost-btn">Close</button>
+    </header>
+
+    <div class="progress-meta">
+      <div class="progress-percent-wrap">
+        <span id="progress-percent" class="progress-percent">0%</span>
+        <span id="progress-phase" class="progress-phase">Waiting</span>
+      </div>
+      <div class="progress-times">
+        <span>Elapsed <strong id="progress-elapsed">0s</strong></span>
+        <span>ETA <strong id="progress-eta">—</strong></span>
+      </div>
+    </div>
+    <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+
+    <ol id="progress-steps" class="progress-steps"></ol>
+    <div id="progress-summary" class="progress-summary" hidden></div>
+  </div>
+</div>
+
+<script src="app.js?v=4"></script>
+</body>
+</html>

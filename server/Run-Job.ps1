@@ -160,7 +160,7 @@ function Get-WingetExitMessage {
         -1978334972  { return @{ ok = $false; reboot = $false; message = 'Another installation is already in progress' } }
         -1978335138  { return @{ ok = $false; reboot = $false; message = 'Download failed. Check the network connection' } }
         # HTTP 403 Forbidden from the vendor CDN (common with EnterpriseDB / PostgreSQL).
-        -2145844845  { return @{ ok = $false; reboot = $false; message = 'Download blocked by the publisher (HTTP 403). Try PostgreSQL 17, or install from postgresql.org' } }
+        -2145844845  { return @{ ok = $false; reboot = $false; message = 'Download blocked by the publisher (HTTP 403). Install from https://www.postgresql.org/download/windows/ or retry later.' } }
         -2146697211  { return @{ ok = $false; reboot = $false; message = 'Download failed (network or TLS error)' } }
     }
     return @{ ok = $false; reboot = $false; message = "winget exited with code $ExitCode" }

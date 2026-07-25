@@ -462,10 +462,11 @@
     {
       "key": "postgresql",
       "name": "PostgreSQL 18",
-      "id": "PostgreSQL.PostgreSQL.18",
+      "kind": "script",
+      "command": "postgresql",
       "category": "databases",
       "description": "Relational database server (latest major).",
-      "notes": "Does not include pgAdmin — pick the separate pgAdmin card if you want the GUI.",
+      "notes": "Installed via direct download — winget is blocked by EnterpriseDB (HTTP 403). Superuser password is printed in the install log. pgAdmin is a separate card.",
       "detect": { "cmd": "psql", "registry": "^PostgreSQL 18" }
     },
     {

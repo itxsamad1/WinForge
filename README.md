@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/logo-mark.png" alt="WinForge" width="128">
+  <img src="docs/images/logo-mark.png" alt="WinForge" width="120">
 </p>
 
 <h1 align="center">WinForge</h1>
@@ -10,22 +10,17 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/logo-full.png" alt="WinForge — Forge your perfect Windows experience" width="360">
+  <img src="https://img.shields.io/badge/Windows-supported-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows supported">
+  <img src="https://img.shields.io/badge/winget-supported-0078D4?style=for-the-badge" alt="winget supported">
+  <img src="https://img.shields.io/badge/Claude%20Code-supported-7C3AED?style=for-the-badge" alt="Claude Code supported">
+  <img src="https://img.shields.io/badge/Codex-supported-7C3AED?style=for-the-badge" alt="Codex supported">
+  <img src="https://img.shields.io/badge/Cursor-supported-7C3AED?style=for-the-badge" alt="Cursor supported">
 </p>
 
 <p align="center">
-  <a href="https://github.com/itxsamad1/WinForge"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4?style=flat-square&logo=windows&logoColor=white" alt="Windows"></a>
-  <a href="https://github.com/itxsamad1/WinForge"><img src="https://img.shields.io/badge/runtime-PowerShell%205.1-5391FE?style=flat-square&logo=powershell&logoColor=white" alt="PowerShell"></a>
-  <a href="https://learn.microsoft.com/windows/package-manager/winget/"><img src="https://img.shields.io/badge/installer-winget-00A4EF?style=flat-square" alt="winget"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-35C37D?style=flat-square" alt="MIT"></a>
   <a href="catalog/apps.json"><img src="https://img.shields.io/badge/catalog-112%20apps-4F8CFF?style=flat-square" alt="112 apps"></a>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Windows-supported-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows supported">
-  <img src="https://img.shields.io/badge/winget-supported-00A4EF?style=for-the-badge" alt="winget supported">
-  <img src="https://img.shields.io/badge/PowerShell-supported-5391FE?style=for-the-badge&logo=powershell&logoColor=white" alt="PowerShell supported">
-  <img src="https://img.shields.io/badge/zero%20dependencies-ready-35C37D?style=for-the-badge" alt="zero dependencies">
+  <img src="https://img.shields.io/badge/deps-none-555555?style=flat-square" alt="zero dependencies">
 </p>
 
 ---

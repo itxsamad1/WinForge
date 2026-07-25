@@ -134,6 +134,11 @@ function Get-WingetProgressInfo {
     <#
         Pull a percent / phase out of a winget console line. Progress frames are
         often filtered from the visible log, but the UI still wants a bar.
+
+        Winget only emits a few milestone lines reliably (Found → Downloading →
+        hash → install → done), so we map those into bands and scale any real
+        download bytes into the downloading band (5–68%) instead of jumping
+        straight from 2% to 70%.
     #>
     param([string]$Line)
     if ([string]::IsNullOrWhiteSpace($Line)) { return $null }
@@ -142,25 +147,51 @@ function Get-WingetProgressInfo {
     $percent = $null
     $detail = $null
 
-    if ($Line -match '(?i)^Found .+\[') { $phase = 'resolving'; $percent = 2 }
-    elseif ($Line -match '(?i)Downloading\s+https?://') { $phase = 'downloading'; $percent = 5 }
-    elseif ($Line -match '(?i)Successfully verified installer hash') { $phase = 'verifying'; $percent = 70 }
-    elseif ($Line -match '(?i)Starting package install') { $phase = 'installing'; $percent = 80 }
-    elseif ($Line -match '(?i)Successfully installed') { $phase = 'done'; $percent = 100 }
-    elseif ($Line -match '(?i)already installed') { $phase = 'done'; $percent = 100 }
+    if ($Line -match '(?i)^Found .+\[') {
+        $phase = 'resolving'; $percent = 3
+    }
+    elseif ($Line -match '(?i)Downloading\s+https?://') {
+        $phase = 'downloading'; $percent = 6
+    }
+    elseif ($Line -match '(?i)Successfully verified installer hash') {
+        $phase = 'verifying'; $percent = 72
+    }
+    elseif ($Line -match '(?i)Starting package install') {
+        $phase = 'installing'; $percent = 78
+    }
+    elseif ($Line -match '(?i)Successfully installed') {
+        $phase = 'done'; $percent = 100
+    }
+    elseif ($Line -match '(?i)already installed') {
+        $phase = 'done'; $percent = 100
+    }
 
+    $downloadPct = $null
     if ($Line -match '(\d+(?:\.\d+)?)\s*%') {
-        $percent = [int][math]::Min(99, [math]::Round([double]$Matches[1]))
+        $downloadPct = [math]::Min(100.0, [double]$Matches[1])
         if ($null -eq $phase) { $phase = 'downloading' }
     }
 
-    if ($Line -match '([\d\.]+)\s*(B|KB|MB|GB)\s*/\s*([\d\.]+)\s*(B|KB|MB|GB)') {
+    # winget / progress bars: "12.4 MB / 358.9 MB" (also "of" and thin spaces)
+    $sizeLine = $Line -replace '[\u00A0\u202F]', ' '
+    if ($sizeLine -match '([\d\.]+)\s*(B|KB|MB|GB)\s*(?:/|of)\s*([\d\.]+)\s*(B|KB|MB|GB)') {
         $current = Convert-SizeToBytes -Value ([double]$Matches[1]) -Unit $Matches[2]
         $total = Convert-SizeToBytes -Value ([double]$Matches[3]) -Unit $Matches[4]
         if ($total -gt 0) {
-            $percent = [int][math]::Min(99, [math]::Round(100.0 * $current / $total))
+            $downloadPct = 100.0 * $current / $total
             $detail = "$($Matches[1]) $($Matches[2]) / $($Matches[3]) $($Matches[4])"
             if ($null -eq $phase) { $phase = 'downloading' }
+        }
+    }
+
+    if ($null -ne $downloadPct) {
+        if ($phase -eq 'verifying' -or $phase -eq 'installing' -or $phase -eq 'done') {
+            # Keep milestone percents once we leave the download phase.
+        } else {
+            $phase = 'downloading'
+            # Map 0–100% of the file into the 6–68% UI band.
+            $percent = [int][math]::Round(6 + (62.0 * [math]::Min(100.0, $downloadPct) / 100.0))
+            $percent = [math]::Min(68, [math]::Max(6, $percent))
         }
     }
 

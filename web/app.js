@@ -60,6 +60,15 @@
     done: 'Done'
   };
 
+  // Soft ceiling while a phase has no finer winget updates (avoids 2% → 70% jumps).
+  var PHASE_SOFT_CAP = {
+    starting: 12,
+    resolving: 5,
+    downloading: 68,
+    verifying: 76,
+    installing: 94
+  };
+
   // ---------------------------------------------------------------- helpers
 
   function readToken() {
@@ -110,7 +119,33 @@
     if (step.state === 'failed') { return 100; }
     if (step.state === 'running') {
       var percent = typeof step.percent === 'number' ? step.percent : parseInt(step.percent, 10);
-      return isNaN(percent) ? 8 : Math.max(0, Math.min(99, percent));
+      if (isNaN(percent)) { percent = 8; }
+
+      // When winget only reports milestones, ease the bar forward within the
+      // current phase so a long download does not sit on 2% for minutes.
+      if (job) {
+        if (!job.softProgress) { job.softProgress = {}; }
+        var key = step.key || String(step.index);
+        var base = percent;
+        var phase = step.phase || 'starting';
+        var prev = job.softProgress[key];
+        if (!prev || prev.base !== base || prev.phase !== phase) {
+          job.softProgress[key] = { base: base, phase: phase, since: Date.now(), shown: base };
+          prev = job.softProgress[key];
+        }
+        var cap = PHASE_SOFT_CAP[phase];
+        if (typeof cap === 'number' && base < cap) {
+          var elapsed = Date.now() - prev.since;
+          var crawl = base + (cap - base) * (1 - Math.exp(-elapsed / 75000));
+          percent = Math.max(prev.shown || base, Math.min(cap - 1, crawl));
+          prev.shown = percent;
+        } else {
+          prev.shown = base;
+          percent = base;
+        }
+      }
+
+      return Math.max(0, Math.min(99, Math.round(percent)));
     }
     return 0;
   }

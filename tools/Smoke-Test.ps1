@@ -141,6 +141,17 @@ Test-Case 'log sanitiser strips ANSI and progress frames' {
     return "'$clean'"
 }
 
+Test-Case 'winget progress maps download bytes into a mid band' {
+    $found = Get-WingetProgressInfo -Line 'Found pgAdmin 4 [PostgreSQL.pgAdmin] Version 9.16'
+    Assert-True ($found.percent -eq 3) "found percent was $($found.percent)"
+    $mid = Get-WingetProgressInfo -Line '179.4 MB / 358.9 MB'
+    Assert-True ($mid.phase -eq 'downloading') "phase was $($mid.phase)"
+    Assert-True ($mid.percent -ge 30 -and $mid.percent -le 45) "mid download percent was $($mid.percent)"
+    $done = Get-WingetProgressInfo -Line 'Successfully verified installer hash'
+    Assert-True ($done.percent -eq 72) "verify percent was $($done.percent)"
+    return "bands ok ($($mid.percent)%)"
+}
+
 # ---------------------------------------------------------------------------
 Write-Host ''
 Write-Host '  Server' -ForegroundColor White

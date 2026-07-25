@@ -10,10 +10,33 @@ $script:CatalogApps = @{}
 $script:CatalogOrder = @()
 $script:CatalogPresets = @()
 $script:CatalogCategories = @()
+$script:CatalogStamp = $null
+$script:CatalogContext = $null
+
+function Get-CatalogStamp {
+    param([Parameter(Mandatory = $true)] [hashtable]$Context)
+    $appsPath = Join-Path $Context.CatalogDir 'apps.json'
+    $presetsPath = Join-Path $Context.CatalogDir 'presets.json'
+    $appsTime = if (Test-Path -LiteralPath $appsPath) { (Get-Item -LiteralPath $appsPath).LastWriteTimeUtc.Ticks } else { 0 }
+    $presetsTime = if (Test-Path -LiteralPath $presetsPath) { (Get-Item -LiteralPath $presetsPath).LastWriteTimeUtc.Ticks } else { 0 }
+    return "${appsTime}:${presetsTime}"
+}
+
+function Ensure-CatalogFresh {
+    <#
+        Re-read apps.json when it changes on disk so a long-lived server does
+        not keep serving an old catalog (e.g. PostgreSQL 16 after an upgrade).
+    #>
+    param([Parameter(Mandatory = $true)] [hashtable]$Context)
+    $stamp = Get-CatalogStamp -Context $Context
+    if ($script:CatalogStamp -eq $stamp -and $script:CatalogOrder.Count -gt 0) { return }
+    Initialize-Catalog -Context $Context
+}
 
 function Initialize-Catalog {
     param([Parameter(Mandatory = $true)] [hashtable]$Context)
 
+    $script:CatalogContext = $Context
     $appsPath = Join-Path $Context.CatalogDir 'apps.json'
     $presetsPath = Join-Path $Context.CatalogDir 'presets.json'
 
@@ -39,8 +62,6 @@ function Initialize-Catalog {
     $presetsDoc = Read-JsonFile -Path $presetsPath
     $script:CatalogPresets = ConvertTo-Array (Get-Prop $presetsDoc 'presets')
 
-    # A preset pointing at a removed app would silently install less than the
-    # user expects, so surface it at startup instead.
     foreach ($preset in $script:CatalogPresets) {
         foreach ($key in (ConvertTo-Array (Get-Prop $preset 'apps'))) {
             if (-not $script:CatalogApps.ContainsKey($key)) {
@@ -49,10 +70,12 @@ function Initialize-Catalog {
         }
     }
 
+    $script:CatalogStamp = Get-CatalogStamp -Context $Context
     Write-Host "  Catalog: $($script:CatalogOrder.Count) apps, $($script:CatalogPresets.Count) presets" -ForegroundColor DarkGray
 }
 
 function Get-CatalogApps {
+    if ($null -ne $script:CatalogContext) { Ensure-CatalogFresh -Context $script:CatalogContext }
     $result = @()
     foreach ($key in $script:CatalogOrder) {
         $result += $script:CatalogApps[$key]
@@ -62,12 +85,19 @@ function Get-CatalogApps {
 
 function Get-CatalogApp {
     param([Parameter(Mandatory = $true)] [string]$Key)
+    if ($null -ne $script:CatalogContext) { Ensure-CatalogFresh -Context $script:CatalogContext }
     if ($script:CatalogApps.ContainsKey($Key)) { return $script:CatalogApps[$Key] }
     return $null
 }
 
-function Get-CatalogCategories { return $script:CatalogCategories }
-function Get-CatalogPresets { return $script:CatalogPresets }
+function Get-CatalogCategories {
+    if ($null -ne $script:CatalogContext) { Ensure-CatalogFresh -Context $script:CatalogContext }
+    return $script:CatalogCategories
+}
+function Get-CatalogPresets {
+    if ($null -ne $script:CatalogContext) { Ensure-CatalogFresh -Context $script:CatalogContext }
+    return $script:CatalogPresets
+}
 
 function Add-OrderedApp {
     param(
@@ -98,6 +128,8 @@ function Resolve-InstallPlan {
         before the Android env scripts.
     #>
     param([Parameter(Mandatory = $true)] [string[]]$Keys)
+
+    if ($null -ne $script:CatalogContext) { Ensure-CatalogFresh -Context $script:CatalogContext }
 
     $requested = @()
     $unknown = @()

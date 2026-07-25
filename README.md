@@ -18,10 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Windows-supported-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows supported">
-  <img src="https://img.shields.io/badge/winget-supported-00A4EF?style=for-the-badge" alt="winget supported">
-  <img src="https://img.shields.io/badge/Claude%20Code-supported-D97757?style=for-the-badge" alt="Claude Code supported">
-  <img src="https://img.shields.io/badge/Codex-supported-10A37F?style=for-the-badge" alt="Codex supported">
-  <img src="https://img.shields.io/badge/Cursor-supported-6E56CF?style=for-the-badge" alt="Cursor supported">
+  <img src="https://img.shields.io/badge/winget-supported-00A4EF?style=for-the-badge" alt="winget supported"
 </p>
 
 ---

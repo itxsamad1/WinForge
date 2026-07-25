@@ -17,6 +17,8 @@
   var searchTerm = '';
   var options = { gitName: '', gitEmail: '', vscodeExtensions: [], cursorExtensions: [] };
   var isoJobs = {}; // key -> { jobId, timer }
+  var activityTimer = null;
+  var activityOpen = false;
 
   var job = null;          // { id, steps, logOffsets, expanded, timer }
 
@@ -29,6 +31,11 @@
     appGroups: document.getElementById('app-groups'),
     clearSelection: document.getElementById('clear-selection'),
     deselectAll: document.getElementById('deselect-all'),
+    activityBtn: document.getElementById('activity-btn'),
+    activityBadge: document.getElementById('activity-badge'),
+    activityPanel: document.getElementById('activity-panel'),
+    activityList: document.getElementById('activity-list'),
+    activityRefresh: document.getElementById('activity-refresh'),
     selectionBar: document.getElementById('selection-bar'),
     selectionCount: document.getElementById('selection-count'),
     selectionLabel: document.getElementById('selection-label'),
@@ -203,6 +210,114 @@
     div.innerHTML = message;
     el.banners.appendChild(div);
     return div;
+  }
+
+  // ---------------------------------------------------------------- activity
+
+  function activityStateClass(state) {
+    if (state === 'finished' || state === 'done') { return 'is-ok'; }
+    if (state === 'failed') { return 'is-err'; }
+    if (state === 'running' || state === 'queued' || state === 'starting' || state === 'awaiting_elevation') {
+      return 'is-running';
+    }
+    return '';
+  }
+
+  function activityStateLabel(state) {
+    if (state === 'awaiting_elevation') { return 'UAC'; }
+    if (state === 'finished') { return 'Done'; }
+    if (state === 'failed') { return 'Failed'; }
+    if (state === 'running') { return 'Running'; }
+    if (state === 'queued' || state === 'starting') { return 'Starting'; }
+    return state || '';
+  }
+
+  function renderActivity(data) {
+    if (!el.activityList) { return; }
+    var active = data && typeof data.activeCount === 'number' ? data.activeCount : 0;
+    if (el.activityBadge) {
+      el.activityBadge.hidden = active <= 0;
+      el.activityBadge.textContent = String(active);
+    }
+    if (el.activityBtn) {
+      el.activityBtn.classList.toggle('has-active', active > 0);
+    }
+
+    var items = [];
+    (data.isos || []).forEach(function (item) { items.push(item); });
+    (data.installs || []).forEach(function (item) { items.push(item); });
+
+    if (!items.length) {
+      el.activityList.innerHTML = '<p class="activity-empty">Nothing running right now.</p>';
+      return;
+    }
+
+    el.activityList.innerHTML = items.map(function (item) {
+      var pct = typeof item.percent === 'number' ? item.percent : null;
+      var msg = item.message || '';
+      var speed = (item.kind === 'iso' && item.detail) ? item.detail : '';
+      if (item.kind === 'install' && item.detail) {
+        msg = msg ? msg : item.detail;
+      }
+      var bar = pct == null ? '' :
+        '<div class="activity-item-bar"><div class="activity-item-fill" style="width:' + Math.max(0, Math.min(100, pct)) + '%"></div></div>';
+      var metaClass = 'activity-item-meta ' + activityStateClass(item.state);
+      return '<button type="button" class="activity-item" data-kind="' + escapeHtml(item.kind) +
+        '" data-job="' + escapeHtml(item.jobId || '') + '">' +
+        '<div class="activity-item-top">' +
+        '<span class="activity-item-name">' + escapeHtml(item.name || 'Job') + '</span>' +
+        '<span class="' + metaClass + '">' + escapeHtml(activityStateLabel(item.state)) +
+        (pct != null ? ' · ' + pct + '%' : '') + '</span></div>' +
+        '<div class="activity-item-row">' +
+        '<span class="activity-item-msg">' + escapeHtml(msg) + '</span>' +
+        (speed ? '<span class="activity-item-speed">' + escapeHtml(speed) + '</span>' : '') +
+        '</div>' + bar + '</button>';
+    }).join('');
+  }
+
+  function loadActivity() {
+    return api('/api/activity').then(function (data) {
+      renderActivity(data || { installs: [], isos: [], activeCount: 0 });
+      return data;
+    }).catch(function () { /* best-effort */ });
+  }
+
+  function openActivityPanel(open) {
+    activityOpen = !!open;
+    if (!el.activityPanel || !el.activityBtn) { return; }
+    el.activityPanel.hidden = !activityOpen;
+    el.activityBtn.setAttribute('aria-expanded', activityOpen ? 'true' : 'false');
+    if (activityOpen) { loadActivity(); }
+  }
+
+  function scheduleActivityPoll() {
+    if (activityTimer) { clearTimeout(activityTimer); }
+    activityTimer = setTimeout(function () {
+      loadActivity().finally(function () { scheduleActivityPoll(); });
+    }, activityOpen ? 1200 : 4000);
+  }
+
+  function resumeInstallJob(jobId) {
+    if (!jobId) { return; }
+    if (job && job.id === jobId && job.timer) {
+      el.progressPanel.hidden = false;
+      return;
+    }
+    if (job && job.timer) { clearTimeout(job.timer); }
+    job = {
+      id: jobId,
+      expanded: new Set(),
+      logOffsets: {},
+      lastState: {},
+      timer: null,
+      startedAt: Date.now(),
+      softProgress: {}
+    };
+    el.progressPanel.hidden = false;
+    el.progressTitle.textContent = 'Installing';
+    el.progressSummary.hidden = true;
+    el.progressClose.hidden = false;
+    pollJob();
   }
 
   // ---------------------------------------------------------------- loading
@@ -474,6 +589,7 @@
       }
       setIsoStatus(card, 'Downloading to ' + (data.destDir || '') + '…');
       pollIsoJob(card, data.jobId);
+      loadActivity();
     }).catch(function (error) {
       setIsoProgress(card, null);
       setIsoStatus(card, error.message || 'Could not start download', 'err');
@@ -567,6 +683,7 @@
         el.progressSub.textContent = 'Running ' + data.steps.length + ' step' + (data.steps.length === 1 ? '' : 's') + '.';
       }
       pollJob();
+      loadActivity();
     }).catch(function (error) {
       el.progressTitle.textContent = 'Could not start';
       el.progressSub.textContent = error.message;
@@ -827,7 +944,8 @@
       el.search.select();
     }
     if (event.key === 'Escape') {
-      if (!el.optionsModal.hidden) { el.optionsModal.hidden = true; }
+      if (activityOpen) { openActivityPanel(false); }
+      else if (!el.optionsModal.hidden) { el.optionsModal.hidden = true; }
       else if (!el.progressPanel.hidden && !el.progressClose.hidden) { el.progressPanel.hidden = true; }
     }
   });
@@ -863,9 +981,45 @@
 
   el.installBtn.addEventListener('click', startInstall);
 
+  if (el.activityBtn) {
+    el.activityBtn.addEventListener('click', function (event) {
+      event.stopPropagation();
+      openActivityPanel(el.activityPanel.hidden);
+    });
+  }
+  if (el.activityRefresh) {
+    el.activityRefresh.addEventListener('click', function (event) {
+      event.stopPropagation();
+      loadActivity();
+    });
+  }
+  if (el.activityList) {
+    el.activityList.addEventListener('click', function (event) {
+      var item = event.target.closest('.activity-item');
+      if (!item) { return; }
+      var kind = item.getAttribute('data-kind');
+      var jobId = item.getAttribute('data-job');
+      openActivityPanel(false);
+      if (kind === 'install') {
+        resumeInstallJob(jobId);
+      } else if (kind === 'iso') {
+        activeCategory = 'os';
+        renderCategories();
+        renderApps();
+        var group = document.getElementById('group-os');
+        if (group) { group.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      }
+    });
+  }
+  document.addEventListener('click', function (event) {
+    if (!activityOpen) { return; }
+    if (event.target.closest('.activity-wrap')) { return; }
+    openActivityPanel(false);
+  });
+
   el.progressClose.addEventListener('click', function () {
     el.progressPanel.hidden = true;
-    if (job && job.timer) { clearTimeout(job.timer); }
+    // Keep polling in the background so Activity stays up to date.
   });
 
   el.progressSteps.addEventListener('click', function (event) {
@@ -885,6 +1039,8 @@
 
   loadCatalog()
     .then(function () { return loadInstalled(false); })
+    .then(function () { return loadActivity(); })
+    .then(function () { scheduleActivityPoll(); })
     .catch(function (error) {
       el.appGroups.innerHTML = '<div class="empty-state">Could not load the catalog: ' + escapeHtml(error.message) + '</div>';
     });

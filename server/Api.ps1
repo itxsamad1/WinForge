@@ -150,6 +150,12 @@ function Invoke-ApiRoute {
             return
         }
 
+        '^/api/activity$' {
+            if ($method -ne 'GET') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use GET' }; return }
+            Write-JsonResponse -Response $Response -Value (Get-ActivitySnapshot -Context $Context)
+            return
+        }
+
         '^/api/iso/download$' {
             if ($method -ne 'POST') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use POST' }; return }
             $body = Read-RequestBody -Request $Request

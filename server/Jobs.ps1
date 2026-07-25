@@ -165,3 +165,81 @@ function Get-JobState {
         logs   = $logs
     }
 }
+
+function Get-ActivitySnapshot {
+    <#
+        Recent install + ISO jobs for the top-bar Activity panel.
+    #>
+    param([Parameter(Mandatory = $true)] [hashtable]$Context)
+
+    $installs = @()
+    $jobsDir = $Context.JobsDir
+    if (Test-Path -LiteralPath $jobsDir) {
+        $dirs = Get-ChildItem -LiteralPath $jobsDir -Directory -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 12
+        foreach ($dir in $dirs) {
+            if ($dir.Name -notmatch '^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$') { continue }
+            $status = Read-JsonFile -Path (Join-Path $dir.FullName 'status.json')
+            if ($null -eq $status) { continue }
+            $steps = @(ConvertTo-Array (Get-Prop $status 'steps'))
+            $running = $steps | Where-Object { (Get-Prop $_ 'state') -eq 'running' } | Select-Object -First 1
+            $done = @($steps | Where-Object { (Get-Prop $_ 'state') -in @('done', 'manual') }).Count
+            $failed = @($steps | Where-Object { (Get-Prop $_ 'state') -eq 'failed' }).Count
+            $label = if ($null -ne $running) {
+                Get-Prop $running 'name' 'Installing'
+            } elseif ($steps.Count -gt 0) {
+                "Install ($($steps.Count) apps)"
+            } else {
+                'Install job'
+            }
+            $pct = $null
+            if ($null -ne $running -and $null -ne (Get-Prop $running 'percent')) {
+                $pct = [int](Get-Prop $running 'percent')
+            } elseif ($steps.Count -gt 0) {
+                $pct = [int][math]::Round(100.0 * ($done + $failed) / $steps.Count)
+            }
+            $installs += [pscustomobject]@{
+                kind    = 'install'
+                jobId   = Get-Prop $status 'jobId' $dir.Name
+                state   = Get-Prop $status 'state' 'unknown'
+                name    = $label
+                detail  = if ($null -ne $running) { Get-Prop $running 'phase' } else { $null }
+                percent = $pct
+                message = if ($null -ne $running) { Get-Prop $running 'message' } else { $null }
+            }
+        }
+    }
+
+    $isos = @()
+    $isoRoot = Join-Path $Context.StateDir 'iso-jobs'
+    if (Test-Path -LiteralPath $isoRoot) {
+        $isoDirs = Get-ChildItem -LiteralPath $isoRoot -Directory -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 12
+        foreach ($dir in $isoDirs) {
+            if ($dir.Name -notmatch '^[a-f0-9]{12}$') { continue }
+            $status = Read-JsonFile -Path (Join-Path $dir.FullName 'status.json')
+            if ($null -eq $status) { continue }
+            $isos += [pscustomobject]@{
+                kind    = 'iso'
+                jobId   = Get-Prop $status 'jobId' $dir.Name
+                state   = Get-Prop $status 'state' 'unknown'
+                name    = Get-Prop $status 'name' 'ISO download'
+                detail  = Get-Prop $status 'speed'
+                percent = Get-Prop $status 'percent'
+                message = Get-Prop $status 'message'
+                destPath = Get-Prop $status 'destPath'
+            }
+        }
+    }
+
+    $activeCount = @($installs | Where-Object { $_.state -notin @('finished', 'failed') }).Count +
+        @($isos | Where-Object { $_.state -in @('queued', 'running') }).Count
+
+    return [pscustomobject]@{
+        activeCount = $activeCount
+        installs    = $installs
+        isos        = $isos
+    }
+}

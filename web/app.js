@@ -86,6 +86,9 @@
   function api(path, init) {
     init = init || {};
     init.headers = Object.assign({ 'X-WinForge-Token': token }, init.headers || {});
+    if (init.body != null && typeof init.body !== 'string') {
+      init.body = JSON.stringify(init.body);
+    }
     if (init.body) { init.headers['Content-Type'] = 'application/json'; }
     return fetch(path, init).then(function (response) {
       return response.json().catch(function () { return {}; }).then(function (data) {

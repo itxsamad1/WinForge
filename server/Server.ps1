@@ -173,6 +173,7 @@ function Start-WinForgeServer {
     }
 
     Initialize-Catalog -Context $Context
+    Initialize-IsoCatalog -Context $Context
     Start-InstalledCacheRefresh -Context $Context | Out-Null
 
     Write-Host '  Server running. Waiting for requests...' -ForegroundColor DarkGray

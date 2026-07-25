@@ -49,7 +49,8 @@ Stop with `Ctrl+C` in the console window.
 
 ## Features
 
-- **Curated catalog** — 100+ apps across editors, runtimes, databases, AI CLIs, media, and utilities
+- **OS ISO downloads** — Windows (official Microsoft page), Ubuntu, Kali, and Parrot with edition + CPU arch pickers; Linux ISOs save under `Downloads\WinForge-ISOs`
+- **Curated catalog** — 100+ apps across editors, runtimes, databases, AI CLIs, media, utilities, and VMs
 - **One-click presets** — Web Dev, Android, Python & AI, Backend, AI Agents, Media
 - **Live install UI** — per-app logs, percent, phase, elapsed time, and ETA
 - **Already-installed detection** — registry + PATH + winget export

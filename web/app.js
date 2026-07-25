@@ -10,12 +10,13 @@
   // ---------------------------------------------------------------- state
 
   var token = readToken();
-  var catalog = { apps: [], categories: [], presets: [] };
+  var catalog = { apps: [], categories: [], presets: [], isos: [], isoDefaultDir: '' };
   var installedByKey = {};
   var selected = new Set();
   var activeCategory = 'all';
   var searchTerm = '';
   var options = { gitName: '', gitEmail: '', vscodeExtensions: [], cursorExtensions: [] };
+  var isoJobs = {}; // key -> { jobId, timer }
 
   var job = null;          // { id, steps, logOffsets, expanded, timer }
 
@@ -231,12 +232,14 @@
   // ---------------------------------------------------------------- render
 
   function appsInCategory(categoryId) {
+    if (categoryId === 'os') { return catalog.isos || []; }
     return catalog.apps.filter(function (app) { return app.category === categoryId; });
   }
 
   function renderCategories() {
+    var total = catalog.apps.length + (catalog.isos ? catalog.isos.length : 0);
     var html = '<button data-category="all" class="' + (activeCategory === 'all' ? 'active' : '') + '">' +
-      '<span>All apps</span><span class="count">' + catalog.apps.length + '</span></button>';
+      '<span>All apps</span><span class="count">' + total + '</span></button>';
 
     catalog.categories.forEach(function (category) {
       var count = appsInCategory(category.id).length;
@@ -263,35 +266,204 @@
     return searchTerm.split(/\s+/).every(function (word) { return haystack.indexOf(word) !== -1; });
   }
 
+  function matchesIsoSearch(os) {
+    if (!searchTerm) { return true; }
+    var haystack = (os.name + ' ' + (os.description || '') + ' ' + os.key + ' ' + (os.family || '')).toLowerCase();
+    return searchTerm.split(/\s+/).every(function (word) { return haystack.indexOf(word) !== -1; });
+  }
+
+  function availableArches(os, editionId) {
+    var edition = (os.editions || []).filter(function (ed) { return ed.id === editionId; })[0];
+    if (!edition) { return os.architectures || []; }
+    if (os.source === 'portal') { return os.architectures || []; }
+    var map = edition.architectures || {};
+    return (os.architectures || []).filter(function (arch) { return !!map[arch.id]; });
+  }
+
+  function renderIsoCard(os) {
+    var editions = os.editions || [];
+    var defaultEdition = editions[0] ? editions[0].id : '';
+    var arches = availableArches(os, defaultEdition);
+    var defaultArch = arches[0] ? arches[0].id : '';
+    var isPortal = os.source === 'portal';
+    var dest = catalog.isoDefaultDir || '';
+
+    var editionOpts = editions.map(function (ed) {
+      return '<option value="' + escapeHtml(ed.id) + '">' + escapeHtml(ed.name) + '</option>';
+    }).join('');
+
+    var archOpts = arches.map(function (arch) {
+      return '<option value="' + escapeHtml(arch.id) + '">' + escapeHtml(arch.name) + '</option>';
+    }).join('');
+
+    var note = os.notes ? '<div class="app-note">' + escapeHtml(os.notes) + '</div>' : '';
+    var actionLabel = isPortal ? 'Open download page' : 'Download ISO';
+    var destBlock = isPortal
+      ? '<p class="iso-hint">Microsoft chooses the file on their site after you pick edition / arch there.</p>'
+      : '<label class="iso-field">Save to<input type="text" class="iso-dest" value="' + escapeHtml(dest) + '" spellcheck="false"></label>';
+
+    return '<div class="iso-card" data-iso="' + escapeHtml(os.key) + '" data-source="' + escapeHtml(os.source || 'direct') + '">' +
+      '<div class="app-name">' + escapeHtml(os.name) + '</div>' +
+      '<div class="app-desc">' + escapeHtml(os.description || '') + '</div>' +
+      note +
+      '<div class="iso-controls">' +
+      '<label class="iso-field">Edition<select class="iso-edition">' + editionOpts + '</select></label>' +
+      '<label class="iso-field">CPU / arch<select class="iso-arch">' + archOpts + '</select></label>' +
+      destBlock +
+      '<button type="button" class="primary-btn iso-download">' + actionLabel + '</button>' +
+      '<div class="iso-status" hidden></div>' +
+      '<div class="iso-progress" hidden><div class="iso-progress-fill"></div></div>' +
+      '</div></div>';
+  }
+
   function renderApps() {
     var visible = catalog.apps.filter(function (app) {
+      if (activeCategory === 'os') { return false; }
       if (activeCategory !== 'all' && app.category !== activeCategory) { return false; }
       return matchesSearch(app);
     });
 
-    if (!visible.length) {
+    var visibleIsos = (catalog.isos || []).filter(function (os) {
+      if (activeCategory !== 'all' && activeCategory !== 'os') { return false; }
+      return matchesIsoSearch(os);
+    });
+
+    if (!visible.length && !visibleIsos.length) {
       el.appGroups.innerHTML = '<div class="empty-state">No apps match "' + escapeHtml(searchTerm) + '".</div>';
       return;
     }
 
-    // Searching flattens the grouping: when you type "docker" you want one
-    // list of hits, not a category outline with a single card in it.
     var groups = [];
     if (searchTerm) {
-      groups.push({ id: 'results', name: 'Results', apps: visible });
+      if (visible.length) {
+        groups.push({ id: 'results', name: 'Results', apps: visible, isos: [] });
+      }
+      if (visibleIsos.length) {
+        groups.push({ id: 'os', name: 'Operating Systems', apps: [], isos: visibleIsos });
+      }
+    } else if (activeCategory === 'os') {
+      groups.push({ id: 'os', name: 'Operating Systems', apps: [], isos: visibleIsos });
     } else {
+      if (activeCategory === 'all' && visibleIsos.length) {
+        groups.push({ id: 'os', name: 'Operating Systems', apps: [], isos: visibleIsos });
+      }
       catalog.categories.forEach(function (category) {
+        if (category.id === 'os') { return; }
         var apps = visible.filter(function (app) { return app.category === category.id; });
-        if (apps.length) { groups.push({ id: category.id, name: category.name, apps: apps }); }
+        if (apps.length) { groups.push({ id: category.id, name: category.name, apps: apps, isos: [] }); }
       });
     }
 
     el.appGroups.innerHTML = groups.map(function (group) {
+      var body = (group.isos && group.isos.length)
+        ? '<div class="iso-grid">' + group.isos.map(renderIsoCard).join('') + '</div>'
+        : '<div class="app-grid">' + group.apps.map(renderCard).join('') + '</div>';
       return '<section class="app-group" id="group-' + escapeHtml(group.id) + '">' +
         '<div class="group-head"><h2>' + escapeHtml(group.name) + '</h2>' +
-        '<span class="group-count">' + group.apps.length + '</span></div>' +
-        '<div class="app-grid">' + group.apps.map(renderCard).join('') + '</div></section>';
+        '<span class="group-count">' + ((group.isos && group.isos.length) || group.apps.length) + '</span></div>' +
+        body + '</section>';
     }).join('');
+  }
+
+  function refreshIsoArchOptions(card) {
+    var key = card.getAttribute('data-iso');
+    var os = (catalog.isos || []).filter(function (item) { return item.key === key; })[0];
+    if (!os) { return; }
+    var editionSel = card.querySelector('.iso-edition');
+    var archSel = card.querySelector('.iso-arch');
+    if (!editionSel || !archSel) { return; }
+    var arches = availableArches(os, editionSel.value);
+    var previous = archSel.value;
+    archSel.innerHTML = arches.map(function (arch) {
+      return '<option value="' + escapeHtml(arch.id) + '">' + escapeHtml(arch.name) + '</option>';
+    }).join('');
+    if (arches.some(function (arch) { return arch.id === previous; })) {
+      archSel.value = previous;
+    }
+  }
+
+  function setIsoStatus(card, text, tone) {
+    var status = card.querySelector('.iso-status');
+    if (!status) { return; }
+    status.hidden = !text;
+    status.textContent = text || '';
+    status.className = 'iso-status' + (tone ? ' iso-status-' + tone : '');
+  }
+
+  function setIsoProgress(card, percent) {
+    var bar = card.querySelector('.iso-progress');
+    var fill = card.querySelector('.iso-progress-fill');
+    if (!bar || !fill) { return; }
+    if (percent == null) {
+      bar.hidden = true;
+      return;
+    }
+    bar.hidden = false;
+    fill.style.width = Math.max(0, Math.min(100, percent)) + '%';
+  }
+
+  function pollIsoJob(card, jobId) {
+    var key = card.getAttribute('data-iso');
+    api('/api/iso/job/' + encodeURIComponent(jobId)).then(function (state) {
+      setIsoProgress(card, typeof state.percent === 'number' ? state.percent : 0);
+      setIsoStatus(card, state.message || 'Downloading…', state.state === 'failed' ? 'err' : null);
+      if (state.state === 'finished') {
+        setIsoProgress(card, 100);
+        setIsoStatus(card, 'Saved to ' + (state.destPath || 'Downloads'), 'ok');
+        var btn = card.querySelector('.iso-download');
+        if (btn) { btn.disabled = false; }
+        if (isoJobs[key] && isoJobs[key].timer) { clearTimeout(isoJobs[key].timer); }
+        delete isoJobs[key];
+        return;
+      }
+      if (state.state === 'failed') {
+        var failBtn = card.querySelector('.iso-download');
+        if (failBtn) { failBtn.disabled = false; }
+        if (isoJobs[key] && isoJobs[key].timer) { clearTimeout(isoJobs[key].timer); }
+        delete isoJobs[key];
+        return;
+      }
+      isoJobs[key] = { jobId: jobId, timer: setTimeout(function () { pollIsoJob(card, jobId); }, 700) };
+    }).catch(function (error) {
+      setIsoStatus(card, error.message || 'Lost contact with download', 'err');
+      var btn = card.querySelector('.iso-download');
+      if (btn) { btn.disabled = false; }
+    });
+  }
+
+  function startIsoDownload(card) {
+    var key = card.getAttribute('data-iso');
+    var edition = card.querySelector('.iso-edition');
+    var arch = card.querySelector('.iso-arch');
+    var dest = card.querySelector('.iso-dest');
+    var btn = card.querySelector('.iso-download');
+    if (!edition || !arch || !btn) { return; }
+
+    btn.disabled = true;
+    setIsoStatus(card, 'Starting…');
+    setIsoProgress(card, card.getAttribute('data-source') === 'direct' ? 1 : null);
+
+    var body = {
+      key: key,
+      edition: edition.value,
+      arch: arch.value,
+      destDir: dest ? dest.value.trim() : ''
+    };
+
+    api('/api/iso/download', { method: 'POST', body: body }).then(function (data) {
+      if (data.mode === 'portal') {
+        setIsoProgress(card, null);
+        setIsoStatus(card, data.message || 'Opened Microsoft download page.', 'ok');
+        btn.disabled = false;
+        return;
+      }
+      setIsoStatus(card, 'Downloading to ' + (data.destDir || '') + '…');
+      pollIsoJob(card, data.jobId);
+    }).catch(function (error) {
+      setIsoProgress(card, null);
+      setIsoStatus(card, error.message || 'Could not start download', 'err');
+      btn.disabled = false;
+    });
   }
 
   function renderCard(app) {
@@ -600,11 +772,27 @@
   });
 
   el.appGroups.addEventListener('click', function (event) {
+    if (event.target.closest('.iso-card')) {
+      if (event.target.closest('.iso-download')) {
+        event.preventDefault();
+        startIsoDownload(event.target.closest('.iso-card'));
+      }
+      return;
+    }
     var card = event.target.closest('.app-card');
     if (card) { toggleApp(card.getAttribute('data-key')); }
   });
 
+  el.appGroups.addEventListener('change', function (event) {
+    var card = event.target.closest('.iso-card');
+    if (!card) { return; }
+    if (event.target.classList.contains('iso-edition')) {
+      refreshIsoArchOptions(card);
+    }
+  });
+
   el.appGroups.addEventListener('keydown', function (event) {
+    if (event.target.closest('.iso-card')) { return; }
     if (event.key !== 'Enter' && event.key !== ' ') { return; }
     var card = event.target.closest('.app-card');
     if (!card) { return; }

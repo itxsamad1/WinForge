@@ -37,9 +37,11 @@ function Invoke-ApiRoute {
         '^/api/catalog$' {
             if ($method -ne 'GET') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use GET' }; return }
             Write-JsonResponse -Response $Response -Value ([pscustomobject]@{
-                categories = @(Get-CatalogCategories)
+                categories = @(@(Get-CatalogCategories) + @([pscustomobject]@{ id = 'os'; name = 'Operating Systems'; icon = 'disc' }))
                 presets    = @(Get-CatalogPresets)
                 apps       = @(Get-CatalogApps)
+                isos       = @(Get-IsoCatalog)
+                isoDefaultDir = Get-DefaultIsoDownloadDir
                 elevated   = $Context.Elevated
                 wingetFound = ($null -ne (Get-Command 'winget' -ErrorAction SilentlyContinue))
             })
@@ -145,6 +147,71 @@ function Invoke-ApiRoute {
             }
             Start-Process $url | Out-Null
             Write-JsonResponse -Response $Response -Value @{ opened = $url }
+            return
+        }
+
+        '^/api/iso/download$' {
+            if ($method -ne 'POST') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use POST' }; return }
+            $body = Read-RequestBody -Request $Request
+            if ($null -eq $body) {
+                Write-JsonResponse -Response $Response -StatusCode 400 -Value @{ error = 'Expected a JSON body.' }
+                return
+            }
+
+            $key = [string](Get-Prop $body 'key')
+            $edition = [string](Get-Prop $body 'edition')
+            $arch = [string](Get-Prop $body 'arch')
+            $destDir = [string](Get-Prop $body 'destDir' '')
+
+            $variant = Resolve-IsoVariant -Key $key -Edition $edition -Arch $arch
+            if ($null -eq $variant) {
+                Write-JsonResponse -Response $Response -StatusCode 400 -Value @{
+                    error = 'Unknown OS / edition / architecture combination.'
+                }
+                return
+            }
+
+            if ($variant.source -eq 'portal') {
+                Start-Process $variant.url | Out-Null
+                Write-JsonResponse -Response $Response -Value ([pscustomobject]@{
+                    mode    = 'portal'
+                    opened  = $variant.url
+                    name    = $variant.name
+                    message = 'Opened the official Microsoft download page. Choose edition and architecture there.'
+                })
+                return
+            }
+
+            if ([string]::IsNullOrWhiteSpace($destDir)) {
+                $destDir = Get-DefaultIsoDownloadDir
+            }
+            if (-not (Test-SafeIsoDestDir -Path $destDir)) {
+                Write-JsonResponse -Response $Response -StatusCode 400 -Value @{
+                    error = 'Destination folder is not allowed. Use your Downloads folder or another user path.'
+                }
+                return
+            }
+
+            $job = Start-IsoDownloadJob -Context $Context -Variant $variant -DestDir $destDir
+            Write-JsonResponse -Response $Response -Value ([pscustomobject]@{
+                mode    = 'download'
+                jobId   = $job.jobId
+                destDir = $job.destDir
+                file    = $job.file
+                name    = $job.name
+            })
+            return
+        }
+
+        '^/api/iso/job/[^/]+$' {
+            if ($method -ne 'GET') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use GET' }; return }
+            $jobId = $route.Substring($route.LastIndexOf('/') + 1)
+            $state = Get-IsoJobState -Context $Context -JobId $jobId
+            if ($null -eq $state) {
+                Write-JsonResponse -Response $Response -StatusCode 404 -Value @{ error = 'Unknown ISO job.' }
+                return
+            }
+            Write-JsonResponse -Response $Response -Value $state
             return
         }
 

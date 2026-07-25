@@ -1,0 +1,151 @@
+{
+  "oses": [
+    {
+      "key": "windows-11",
+      "name": "Windows 11",
+      "family": "windows",
+      "description": "Official Windows 11 ISO. Microsoft does not publish stable direct links, so WinForge opens their download page — pick edition and architecture there.",
+      "source": "portal",
+      "url": "https://www.microsoft.com/software-download/windows11",
+      "editions": [
+        { "id": "consumer", "name": "Consumer (Home / Pro from Microsoft page)" }
+      ],
+      "architectures": [
+        { "id": "x64", "name": "x64 (Intel / AMD)" },
+        { "id": "arm64", "name": "ARM64" }
+      ],
+      "notes": "After download, use Rufus (in Utilities) to write a USB stick."
+    },
+    {
+      "key": "windows-10",
+      "name": "Windows 10",
+      "family": "windows",
+      "description": "Official Windows 10 ISO via Microsoft's download page (edition and arch chosen on their site).",
+      "source": "portal",
+      "url": "https://www.microsoft.com/software-download/windows10ISO",
+      "editions": [
+        { "id": "consumer", "name": "Consumer ISO from Microsoft page" }
+      ],
+      "architectures": [
+        { "id": "x64", "name": "x64 (Intel / AMD)" },
+        { "id": "x86", "name": "x86 (32-bit)" }
+      ],
+      "notes": "Windows 10 is still offered for ISO download; prefer Windows 11 for new machines."
+    },
+    {
+      "key": "ubuntu",
+      "name": "Ubuntu",
+      "family": "linux",
+      "description": "Ubuntu Desktop LTS — official Canonical ISOs.",
+      "source": "direct",
+      "editions": [
+        {
+          "id": "24.04-desktop",
+          "name": "24.04.4 LTS Desktop",
+          "architectures": {
+            "x64": {
+              "url": "https://releases.ubuntu.com/24.04.4/ubuntu-24.04.4-desktop-amd64.iso",
+              "file": "ubuntu-24.04.4-desktop-amd64.iso"
+            },
+            "arm64": {
+              "url": "https://cdimage.ubuntu.com/releases/24.04.4/release/ubuntu-24.04.4-desktop-arm64.iso",
+              "file": "ubuntu-24.04.4-desktop-arm64.iso"
+            }
+          }
+        },
+        {
+          "id": "22.04-desktop",
+          "name": "22.04.5 LTS Desktop",
+          "architectures": {
+            "x64": {
+              "url": "https://releases.ubuntu.com/22.04.5/ubuntu-22.04.5-desktop-amd64.iso",
+              "file": "ubuntu-22.04.5-desktop-amd64.iso"
+            },
+            "arm64": {
+              "url": "https://cdimage.ubuntu.com/releases/22.04.5/release/ubuntu-22.04.5-desktop-arm64.iso",
+              "file": "ubuntu-22.04.5-desktop-arm64.iso"
+            }
+          }
+        }
+      ],
+      "architectures": [
+        { "id": "x64", "name": "x64 / amd64" },
+        { "id": "arm64", "name": "ARM64" }
+      ]
+    },
+    {
+      "key": "kali",
+      "name": "Kali Linux",
+      "family": "linux",
+      "description": "Kali Linux installer images from the official cdimage mirror.",
+      "source": "direct",
+      "editions": [
+        {
+          "id": "2026.2-installer",
+          "name": "2026.2 Installer",
+          "architectures": {
+            "x64": {
+              "url": "https://cdimage.kali.org/current/kali-linux-2026.2-installer-amd64.iso",
+              "file": "kali-linux-2026.2-installer-amd64.iso"
+            },
+            "arm64": {
+              "url": "https://cdimage.kali.org/current/kali-linux-2026.2-installer-arm64.iso",
+              "file": "kali-linux-2026.2-installer-arm64.iso"
+            }
+          }
+        },
+        {
+          "id": "2026.2-netinst",
+          "name": "2026.2 NetInstaller (small)",
+          "architectures": {
+            "x64": {
+              "url": "https://cdimage.kali.org/current/kali-linux-2026.2-installer-netinst-amd64.iso",
+              "file": "kali-linux-2026.2-installer-netinst-amd64.iso"
+            },
+            "arm64": {
+              "url": "https://cdimage.kali.org/current/kali-linux-2026.2-installer-netinst-arm64.iso",
+              "file": "kali-linux-2026.2-installer-netinst-arm64.iso"
+            }
+          }
+        }
+      ],
+      "architectures": [
+        { "id": "x64", "name": "x64 / amd64" },
+        { "id": "arm64", "name": "ARM64" }
+      ]
+    },
+    {
+      "key": "parrot",
+      "name": "Parrot OS",
+      "family": "linux",
+      "description": "Parrot Security / Home — official amd64 ISOs (ARM not published on the main mirror).",
+      "source": "direct",
+      "editions": [
+        {
+          "id": "7.3-security",
+          "name": "7.3 Security",
+          "architectures": {
+            "x64": {
+              "url": "https://deb.parrot.sh/direct/parrot/iso/7.3/Parrot-security-7.3_amd64.iso",
+              "file": "Parrot-security-7.3_amd64.iso"
+            }
+          }
+        },
+        {
+          "id": "7.3-home",
+          "name": "7.3 Home",
+          "architectures": {
+            "x64": {
+              "url": "https://deb.parrot.sh/direct/parrot/iso/7.3/Parrot-home-7.3_amd64.iso",
+              "file": "Parrot-home-7.3_amd64.iso"
+            }
+          }
+        }
+      ],
+      "architectures": [
+        { "id": "x64", "name": "x64 / amd64" }
+      ],
+      "notes": "Parrot’s public ISO mirror is amd64-only for these editions."
+    }
+  ]
+}

@@ -21,6 +21,7 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 . (Join-Path $root 'server\Common.ps1')
 . (Join-Path $root 'server\Catalog.ps1')
+. (Join-Path $root 'server\Iso.ps1')
 . (Join-Path $root 'server\Detect.ps1')
 . (Join-Path $root 'server\Jobs.ps1')
 . (Join-Path $root 'server\Api.ps1')

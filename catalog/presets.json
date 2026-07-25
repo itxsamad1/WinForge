@@ -22,19 +22,25 @@
       "key": "python-ai",
       "name": "Python & AI",
       "description": "Python toolchain plus local model runners.",
-      "apps": ["git", "python-313", "uv", "vscode", "cursor", "windows-terminal", "ollama", "lm-studio"]
+      "apps": ["git", "python-313", "uv", "vscode", "cursor", "windows-terminal", "ollama", "lm-studio", "comfyui", "cuda"]
     },
     {
       "key": "backend",
       "name": "Backend & DevOps",
       "description": "Containers, Kubernetes, cloud CLIs and a database client.",
-      "apps": ["git", "docker-desktop", "kubectl", "helm", "terraform", "postgresql", "dbeaver", "windows-terminal", "powershell-7"]
+      "apps": ["git", "docker-desktop", "kubectl", "helm", "terraform", "postgresql", "pgadmin", "dbeaver", "windows-terminal", "powershell-7"]
+    },
+    {
+      "key": "ai-agents",
+      "name": "AI Agents",
+      "description": "Coding agents and CLI tools for AI-assisted development.",
+      "apps": ["git", "nvm-windows", "antigravity", "claude-code", "codex-cli", "github-copilot-cli", "gemini-cli", "windows-terminal"]
     },
     {
       "key": "media",
       "name": "Design & Media",
       "description": "Editing, capture and encoding tools.",
-      "apps": ["creative-cloud", "figma", "obs-studio", "davinci-resolve", "ffmpeg", "handbrake", "vlc", "sharex"]
+      "apps": ["creative-cloud", "figma", "obs-studio", "bandicam", "davinci-resolve", "ffmpeg", "handbrake", "vlc", "sharex"]
     }
   ]
 }

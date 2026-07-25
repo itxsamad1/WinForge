@@ -156,6 +156,44 @@ function Invoke-ApiRoute {
             return
         }
 
+        '^/api/iso/active$' {
+            if ($method -ne 'GET') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use GET' }; return }
+            $key = [string]$Request.QueryString['key']
+            $edition = [string]$Request.QueryString['edition']
+            $arch = [string]$Request.QueryString['arch']
+            $destDir = [string]$Request.QueryString['destDir']
+            if ([string]::IsNullOrWhiteSpace($key)) {
+                Write-JsonResponse -Response $Response -StatusCode 400 -Value @{ error = 'key is required' }
+                return
+            }
+            $file = $null
+            if (-not [string]::IsNullOrWhiteSpace($edition) -and -not [string]::IsNullOrWhiteSpace($arch)) {
+                $variant = Resolve-IsoVariant -Key $key -Edition $edition -Arch $arch
+                if ($null -ne $variant) { $file = $variant.file }
+            }
+            if ([string]::IsNullOrWhiteSpace($destDir)) { $destDir = Get-DefaultIsoDownloadDir }
+            $existing = Find-ActiveIsoJob -Context $Context -Key $key -File $file -DestDir $destDir
+            if ($null -eq $existing) {
+                Write-JsonResponse -Response $Response -Value @{ active = $false }
+                return
+            }
+            $state = Get-IsoJobState -Context $Context -JobId $existing.jobId
+            Write-JsonResponse -Response $Response -Value ([pscustomobject]@{
+                active     = $true
+                jobId      = $existing.jobId
+                key        = $existing.key
+                name       = $existing.name
+                file       = $existing.file
+                destDir    = $existing.destDir
+                state      = if ($null -ne $state) { Get-Prop $state 'state' 'running' } else { 'running' }
+                percent    = if ($null -ne $state) { Get-Prop $state 'percent' } else { $null }
+                message    = if ($null -ne $state) { Get-Prop $state 'message' } else { 'Downloading' }
+                speed      = if ($null -ne $state) { Get-Prop $state 'speed' } else { $null }
+                destPath   = if ($null -ne $state) { Get-Prop $state 'destPath' } else { $null }
+            })
+            return
+        }
+
         '^/api/iso/download$' {
             if ($method -ne 'POST') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use POST' }; return }
             $body = Read-RequestBody -Request $Request

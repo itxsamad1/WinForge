@@ -191,9 +191,8 @@ function Find-ActiveIsoJob {
     $jobsRoot = Join-Path $Context.StateDir 'iso-jobs'
     if (-not (Test-Path -LiteralPath $jobsRoot)) { return $null }
 
-    $dirs = Get-ChildItem -LiteralPath $jobsRoot -Directory -ErrorAction SilentlyContinue |
-        Sort-Object LastWriteTime -Descending
-
+    $candidates = @()
+    $dirs = Get-ChildItem -LiteralPath $jobsRoot -Directory -ErrorAction SilentlyContinue
     foreach ($dir in $dirs) {
         if ($dir.Name -notmatch '^[a-f0-9]{12}$') { continue }
         $plan = Read-JsonFile -Path (Join-Path $dir.FullName 'plan.json')
@@ -205,9 +204,13 @@ function Find-ActiveIsoJob {
         if ($planKey -ne $Key) { continue }
         if (-not [string]::IsNullOrWhiteSpace($File) -and $planFile -ne $File) { continue }
 
-        $state = if ($null -ne $status) { Get-Prop $status 'state' } else { 'unknown' }
+        $rawState = if ($null -ne $status) { Get-Prop $status 'state' 'unknown' } else { 'unknown' }
         $pidValue = if ($null -ne $status) { Get-Prop $status 'pid' } else { $null }
         $alive = Test-IsoProcessAlive -PidValue $pidValue
+        $percent = 0
+        if ($null -ne $status -and $null -ne (Get-Prop $status 'percent')) {
+            $percent = [int](Get-Prop $status 'percent')
+        }
 
         $fileForPartial = if (-not [string]::IsNullOrWhiteSpace($File)) { $File } else { $planFile }
         $partialBusy = $false
@@ -217,36 +220,100 @@ function Find-ActiveIsoJob {
             if (Test-PathBusy -Path $partialPath) { $partialBusy = $true }
         }
 
-        $recentRunning = $false
-        if ($state -eq 'running' -and $partialExists -and $null -ne $status) {
-            $started = Get-Prop $status 'startedAt'
-            if (-not [string]::IsNullOrWhiteSpace($started)) {
-                try {
-                    $ageMin = ((Get-Date) - [datetime]::Parse($started)).TotalMinutes
-                    if ($ageMin -ge 0 -and $ageMin -lt 180) { $recentRunning = $true }
-                } catch { }
+        # Real in-flight job: process alive, or status still says running with a partial.
+        # Do NOT treat failed sibling jobs as active just because they share a busy partial.
+        $isActive = $false
+        if ($alive) { $isActive = $true }
+        elseif ($rawState -eq 'running' -and ($partialExists -or $partialBusy -or $percent -gt 0)) { $isActive = $true }
+        elseif ($rawState -eq 'queued') { $isActive = $true }
+
+        if (-not $isActive) { continue }
+
+        $writeTime = $dir.LastWriteTimeUtc
+        if ($null -ne $status) {
+            $statusPath = Join-Path $dir.FullName 'status.json'
+            if (Test-Path -LiteralPath $statusPath) {
+                $writeTime = (Get-Item -LiteralPath $statusPath).LastWriteTimeUtc
             }
         }
 
-        if (-not $alive -and -not $partialBusy -and -not $recentRunning) { continue }
-
-        if ($null -ne $status -and ($alive -or $partialBusy -or $recentRunning) -and $state -ne 'running') {
-            $status.state = 'running'
-            $status.message = Get-Prop $status 'message' 'Downloading'
-            $status.key = $planKey
-            try { Write-JsonFile -Path (Join-Path $dir.FullName 'status.json') -Value $status } catch { }
-        }
-
-        return [pscustomobject]@{
+        $candidates += [pscustomobject]@{
             jobId      = $dir.Name
             destDir    = Get-Prop $plan 'destDir' $DestDir
             name       = Get-Prop $plan 'name' (Get-Prop $status 'name' 'ISO')
             file       = $planFile
             key        = $planKey
             reattached = $true
+            rawState   = $rawState
+            alive      = $alive
+            percent    = $percent
+            writeTime  = $writeTime
+            status     = $status
+            statusPath = (Join-Path $dir.FullName 'status.json')
         }
     }
-    return $null
+
+    if ($candidates.Count -eq 0) {
+        # Last resort: partial is locked but every status file says failed —
+        # still reattach to the job with the newest status / highest percent.
+        if ([string]::IsNullOrWhiteSpace($File) -or [string]::IsNullOrWhiteSpace($DestDir)) { return $null }
+        $partialPath = Join-Path $DestDir ($File + '.partial')
+        if (-not (Test-PathBusy -Path $partialPath)) { return $null }
+
+        foreach ($dir in $dirs) {
+            if ($dir.Name -notmatch '^[a-f0-9]{12}$') { continue }
+            $plan = Read-JsonFile -Path (Join-Path $dir.FullName 'plan.json')
+            if ($null -eq $plan) { continue }
+            if ((Get-Prop $plan 'key') -ne $Key) { continue }
+            if ((Get-Prop $plan 'file') -ne $File) { continue }
+            $status = Read-JsonFile -Path (Join-Path $dir.FullName 'status.json')
+            $percent = 0
+            if ($null -ne $status -and $null -ne (Get-Prop $status 'percent')) {
+                $percent = [int](Get-Prop $status 'percent')
+            }
+            $candidates += [pscustomobject]@{
+                jobId      = $dir.Name
+                destDir    = Get-Prop $plan 'destDir' $DestDir
+                name       = Get-Prop $plan 'name' 'ISO'
+                file       = $File
+                key        = $Key
+                reattached = $true
+                rawState   = if ($null -ne $status) { Get-Prop $status 'state' } else { 'unknown' }
+                alive      = $true
+                percent    = $percent
+                writeTime  = (Get-Item -LiteralPath (Join-Path $dir.FullName 'status.json') -ErrorAction SilentlyContinue).LastWriteTimeUtc
+                status     = $status
+                statusPath = (Join-Path $dir.FullName 'status.json')
+            }
+        }
+    }
+
+    if ($candidates.Count -eq 0) { return $null }
+
+    $best = $candidates |
+        Sort-Object `
+            @{ Expression = { if ($_.rawState -eq 'running') { 0 } elseif ($_.alive) { 1 } else { 2 } } }, `
+            @{ Expression = { -$_.percent } }, `
+            @{ Expression = { $_.writeTime }; Descending = $true } |
+        Select-Object -First 1
+
+    if ($null -ne $best.status -and (Get-Prop $best.status 'state') -ne 'running') {
+        $best.status.state = 'running'
+        $best.status.key = $best.key
+        if ([string]::IsNullOrWhiteSpace((Get-Prop $best.status 'message'))) {
+            $best.status.message = 'Downloading'
+        }
+        try { Write-JsonFile -Path $best.statusPath -Value $best.status } catch { }
+    }
+
+    return [pscustomobject]@{
+        jobId      = $best.jobId
+        destDir    = $best.destDir
+        name       = $best.name
+        file       = $best.file
+        key        = $best.key
+        reattached = $true
+    }
 }
 
 function Start-IsoDownloadJob {

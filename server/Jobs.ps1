@@ -174,7 +174,10 @@ function Get-ActivitySnapshot {
 
     $installs = @()
     $jobsDir = $Context.JobsDir
-    if (Test-Path -LiteralPath $jobsDir) {
+    if ([string]::IsNullOrWhiteSpace($jobsDir)) {
+        $jobsDir = Join-Path $Context.StateDir 'jobs'
+    }
+    if (-not [string]::IsNullOrWhiteSpace($jobsDir) -and (Test-Path -LiteralPath $jobsDir)) {
         $dirs = Get-ChildItem -LiteralPath $jobsDir -Directory -ErrorAction SilentlyContinue |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 12
@@ -223,7 +226,7 @@ function Get-ActivitySnapshot {
             $plan = Read-JsonFile -Path (Join-Path $dir.FullName 'plan.json')
             if ($null -eq $status -and $null -eq $plan) { continue }
 
-            $state = if ($null -ne $status) { Get-Prop $status 'state' 'unknown' } else { 'unknown' }
+            $rawState = if ($null -ne $status) { Get-Prop $status 'state' 'unknown' } else { 'unknown' }
             $pidValue = if ($null -ne $status) { Get-Prop $status 'pid' } else { $null }
             $alive = $false
             if ($null -ne $pidValue) {
@@ -233,7 +236,11 @@ function Get-ActivitySnapshot {
                 } catch { $alive = $false }
             }
 
-            $partialBusy = $false
+            $percent = $null
+            if ($null -ne $status -and $null -ne (Get-Prop $status 'percent')) {
+                $percent = [int](Get-Prop $status 'percent')
+            }
+
             $destPath = if ($null -ne $status) { Get-Prop $status 'destPath' } else { $null }
             if ([string]::IsNullOrWhiteSpace($destPath) -and $null -ne $plan) {
                 $pf = Get-Prop $plan 'file'
@@ -242,24 +249,15 @@ function Get-ActivitySnapshot {
                     $destPath = Join-Path $pd $pf
                 }
             }
-            if (-not [string]::IsNullOrWhiteSpace($destPath)) {
-                $partialPath = $destPath + '.partial'
-                if (Test-Path -LiteralPath $partialPath) {
-                    try {
-                        $fs = [System.IO.File]::Open($partialPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
-                        $fs.Dispose()
-                    } catch {
-                        $partialBusy = $true
-                    }
-                }
-            }
 
-            if (($alive -or $partialBusy) -and $state -notin @('running', 'queued')) {
-                $state = 'running'
-            }
+            # Only trust "running" from the status file or a live PID.
+            # A locked .partial must NOT flip every failed sibling job to running.
+            $state = $rawState
+            if ($alive) { $state = 'running' }
+            elseif ($rawState -eq 'running') { $state = 'running' }
 
             $message = if ($null -ne $status) { Get-Prop $status 'message' } else { $null }
-            if ([string]::IsNullOrWhiteSpace($message) -and ($alive -or $partialBusy)) {
+            if ($state -eq 'running' -and [string]::IsNullOrWhiteSpace($message)) {
                 $message = 'Downloading'
             }
 
@@ -270,16 +268,20 @@ function Get-ActivitySnapshot {
                 state    = $state
                 name     = if ($null -ne $status) { Get-Prop $status 'name' 'ISO download' } else { Get-Prop $plan 'name' 'ISO download' }
                 detail   = if ($null -ne $status) { Get-Prop $status 'speed' } else { $null }
-                percent  = if ($null -ne $status) { Get-Prop $status 'percent' } else { $null }
+                percent  = $percent
                 message  = $message
                 destPath = $destPath
-                alive    = ($alive -or $partialBusy)
+                alive    = $alive
             }
         }
     }
 
     $activeCount = @($installs | Where-Object { $_.state -notin @('finished', 'failed') }).Count +
         @($isos | Where-Object { $_.state -in @('queued', 'running') -or $_.alive }).Count
+
+    # Running jobs first so the Activity panel is useful at a glance.
+    $isos = @($isos | Sort-Object @{ Expression = { if ($_.state -eq 'running' -or $_.alive) { 0 } else { 1 } } }, @{ Expression = { if ($null -eq $_.percent) { -1 } else { -[int]$_.percent } } })
+    $installs = @($installs | Sort-Object @{ Expression = { if ($_.state -notin @('finished', 'failed')) { 0 } else { 1 } } })
 
     return [pscustomobject]@{
         activeCount = $activeCount

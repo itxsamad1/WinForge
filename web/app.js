@@ -510,7 +510,29 @@
           percent: item.percent
         });
       });
-    }).catch(function () { /* best-effort */ });
+    }).catch(function () { /* best-effort */ }).then(function () {
+      // Also probe each visible ISO card in case Activity is empty/stale.
+      var cards = el.appGroups ? el.appGroups.querySelectorAll('.iso-card[data-source="direct"]') : [];
+      Array.prototype.forEach.call(cards, function (card) {
+        var key = card.getAttribute('data-iso');
+        if (!key || (isoJobs[key] && isoJobs[key].jobId)) { return; }
+        var edition = card.querySelector('.iso-edition');
+        var arch = card.querySelector('.iso-arch');
+        var dest = card.querySelector('.iso-dest');
+        if (!edition || !arch) { return; }
+        var q = '/api/iso/active?key=' + encodeURIComponent(key) +
+          '&edition=' + encodeURIComponent(edition.value) +
+          '&arch=' + encodeURIComponent(arch.value) +
+          '&destDir=' + encodeURIComponent(dest ? dest.value.trim() : '');
+        api(q).then(function (existing) {
+          if (!existing || !existing.active || !existing.jobId) { return; }
+          attachIsoJobToCard(key, existing.jobId, {
+            message: existing.message || 'Downloading…',
+            percent: existing.percent
+          });
+        }).catch(function () { /* best-effort */ });
+      });
+    });
   }
 
   function refreshIsoArchOptions(card) {
@@ -603,44 +625,64 @@
     setIsoStatus(card, 'Starting…');
     setIsoProgress(card, card.getAttribute('data-source') === 'direct' ? 1 : null);
 
+    var destDir = dest ? dest.value.trim() : '';
     var body = {
       key: key,
       edition: edition.value,
       arch: arch.value,
-      destDir: dest ? dest.value.trim() : ''
+      destDir: destDir
     };
 
-    api('/api/iso/download', { method: 'POST', body: body }).then(function (data) {
-      if (data.mode === 'portal') {
-        setIsoProgress(card, null);
-        setIsoStatus(card, data.message || 'Opened Microsoft download page.', 'ok');
-        btn.disabled = false;
+    function beginDownload() {
+      return api('/api/iso/download', { method: 'POST', body: body }).then(function (data) {
+        if (data.mode === 'portal') {
+          setIsoProgress(card, null);
+          setIsoStatus(card, data.message || 'Opened Microsoft download page.', 'ok');
+          btn.disabled = false;
+          return;
+        }
+        if (data.reattached) {
+          setIsoStatus(card, 'Reconnected to download already in progress…');
+        } else {
+          setIsoStatus(card, 'Downloading to ' + (data.destDir || '') + '…');
+        }
+        if (isoJobs[key] && isoJobs[key].timer) { clearTimeout(isoJobs[key].timer); }
+        isoJobs[key] = { jobId: data.jobId, timer: null };
+        pollIsoJob(card, data.jobId);
+        loadActivity();
+      });
+    }
+
+    // Prefer an existing in-flight job before starting a new downloader.
+    var q = '/api/iso/active?key=' + encodeURIComponent(key) +
+      '&edition=' + encodeURIComponent(edition.value) +
+      '&arch=' + encodeURIComponent(arch.value) +
+      '&destDir=' + encodeURIComponent(destDir);
+
+    api(q).then(function (existing) {
+      if (existing && existing.active && existing.jobId) {
+        setIsoStatus(card, existing.message || 'Reconnected to download…', null, existing.speed || '');
+        attachIsoJobToCard(key, existing.jobId, {
+          message: existing.message || 'Downloading…',
+          percent: existing.percent
+        });
+        loadActivity();
         return;
       }
-      if (data.reattached) {
-        setIsoStatus(card, 'Reconnected to download already in progress…');
-      } else {
-        setIsoStatus(card, 'Downloading to ' + (data.destDir || '') + '…');
-      }
-      if (isoJobs[key] && isoJobs[key].timer) { clearTimeout(isoJobs[key].timer); }
-      isoJobs[key] = { jobId: data.jobId, timer: null };
-      pollIsoJob(card, data.jobId);
-      loadActivity();
+      return beginDownload();
+    }).catch(function () {
+      return beginDownload();
     }).catch(function (error) {
       var msg = error.message || 'Could not start download';
-      // Server said the file is busy — reconnect UI to the existing job.
       if (/already downloading/i.test(msg)) {
         setIsoStatus(card, 'Reconnecting to download in progress…');
-        api('/api/activity').then(function (data) {
-          renderActivity(data || { installs: [], isos: [], activeCount: 0 });
-          var match = (data.isos || []).filter(function (item) {
-            return item.key === key && (item.state === 'running' || item.state === 'queued' || item.alive);
-          })[0];
-          if (match && match.jobId) {
-            attachIsoJobToCard(key, match.jobId, {
-              message: match.message || 'Downloading…',
-              percent: match.percent
+        return api(q).then(function (existing) {
+          if (existing && existing.active && existing.jobId) {
+            attachIsoJobToCard(key, existing.jobId, {
+              message: existing.message || 'Downloading…',
+              percent: existing.percent
             });
+            loadActivity();
             return;
           }
           setIsoStatus(card, msg, 'err');
@@ -649,7 +691,6 @@
           setIsoStatus(card, msg, 'err');
           btn.disabled = false;
         });
-        return;
       }
       setIsoProgress(card, null);
       setIsoStatus(card, msg, 'err');
@@ -835,6 +876,67 @@
     });
   }
 
+  function catalogAppForKey(key) {
+    if (!key) { return null; }
+    return (catalog.apps || []).filter(function (app) { return app.key === key; })[0] || null;
+  }
+
+  function manualInstructionsHtml(step) {
+    var app = catalogAppForKey(step.key);
+    var text = (app && app.instructions) ||
+      'This app is not available through winget. Download and install it from the vendor site.';
+    var url = app && app.url;
+    var openBtn = url
+      ? '<button type="button" class="primary-btn manual-open-btn" data-open-app="' +
+        escapeHtml(step.key) + '">Open download page</button>'
+      : '';
+    return '<div class="manual-guide">' +
+      '<p class="manual-guide-text">' + escapeHtml(text) + '</p>' +
+      openBtn +
+      '</div>';
+  }
+
+  function ensureManualStepContent(step) {
+    var li = document.getElementById('step-' + step.index);
+    if (!li) { return; }
+
+    var actions = li.querySelector('.manual-actions');
+    if (!actions) {
+      actions = document.createElement('div');
+      actions.className = 'manual-actions';
+      actions.innerHTML = manualInstructionsHtml(step);
+      li.appendChild(actions);
+    }
+
+    job.expanded.add(step.index);
+    var log = document.getElementById('log-' + step.index);
+    // Keep the log visible only when the runner actually wrote something;
+    // otherwise the guide above is the instructions.
+    if (log) { log.hidden = !log.textContent.trim(); }
+  }
+
+  function fetchStepLogs(indexes) {
+    if (!job || !job.id || !indexes || !indexes.length) { return Promise.resolve(); }
+    var since = indexes.map(function (index) { return job.logOffsets[index] || 0; });
+    var query = '/api/job/' + encodeURIComponent(job.id) +
+      '?tail=' + indexes.join(',') + '&since=' + since.join(',');
+    return api(query).then(function (data) {
+      Object.keys(data.logs || {}).forEach(function (indexKey) {
+        var chunk = data.logs[indexKey];
+        if (!chunk || !chunk.lines || !chunk.lines.length) {
+          if (chunk) { job.logOffsets[indexKey] = chunk.total; }
+          return;
+        }
+        var pre = document.getElementById('log-' + indexKey);
+        if (pre) {
+          pre.textContent += chunk.lines.join('\n') + '\n';
+          pre.hidden = false;
+        }
+        job.logOffsets[indexKey] = chunk.total;
+      });
+    }).catch(function () { /* best-effort */ });
+  }
+
   function renderStep(step) {
     var existing = document.getElementById('step-' + step.index);
     var pct = stepProgressValue(step);
@@ -889,8 +991,12 @@
       }
     }
 
-    var log = document.getElementById('log-' + step.index);
-    if (log) { log.hidden = !job.expanded.has(step.index); }
+    if (step.state === 'manual') {
+      ensureManualStepContent(step);
+    } else {
+      var log = document.getElementById('log-' + step.index);
+      if (log) { log.hidden = !job.expanded.has(step.index); }
+    }
   }
 
   function finishJob(status) {
@@ -908,6 +1014,14 @@
     el.progressClose.hidden = false;
     el.installBtn.disabled = false;
 
+    // Manual steps finish instantly — make sure instructions are visible and logs loaded.
+    manual.forEach(function (step) {
+      ensureManualStepContent(step);
+    });
+    if (manual.length) {
+      fetchStepLogs(manual.map(function (step) { return step.index; }));
+    }
+
     var items = [];
     if (done.length) {
       items.push('<li class="tone-ok">' + done.length + ' app' + (done.length === 1 ? '' : 's') + ' installed.</li>');
@@ -917,7 +1031,14 @@
       items.push('<li class="tone-warn">A restart is required before some of these will work.</li>');
     }
     manual.forEach(function (step) {
-      items.push('<li class="tone-warn">' + escapeHtml(step.name) + ' needs a manual step. Expand it above for instructions.</li>');
+      var app = catalogAppForKey(step.key);
+      var text = (app && app.instructions) || 'Download and install it from the vendor site.';
+      var open = (app && app.url)
+        ? ' <button type="button" class="link-btn manual-open-btn" data-open-app="' +
+          escapeHtml(step.key) + '">Open download page</button>'
+        : '';
+      items.push('<li class="tone-warn"><strong>' + escapeHtml(step.name) + ':</strong> ' +
+        escapeHtml(text) + open + '</li>');
     });
     failed.forEach(function (step) {
       items.push('<li class="tone-err">' + escapeHtml(step.name) + ' failed: ' + escapeHtml(step.message || 'unknown error') + '</li>');
@@ -1089,13 +1210,38 @@
   });
 
   el.progressSteps.addEventListener('click', function (event) {
+    var openBtn = event.target.closest('[data-open-app]');
+    if (openBtn) {
+      event.preventDefault();
+      var openKey = openBtn.getAttribute('data-open-app');
+      api('/api/open', { method: 'POST', body: { app: openKey } }).catch(function (error) {
+        showBanner('Could not open download page: ' + escapeHtml(error.message || 'unknown error'), 'err');
+      });
+      return;
+    }
+
     var head = event.target.closest('.step-head');
     if (!head || !job) { return; }
     var index = parseInt(head.getAttribute('data-index'), 10);
     if (job.expanded.has(index)) { job.expanded.delete(index); } else { job.expanded.add(index); }
     var log = document.getElementById('log-' + index);
     if (log) { log.hidden = !job.expanded.has(index); }
+    if (job.expanded.has(index)) {
+      fetchStepLogs([index]);
+    }
   });
+
+  if (el.progressSummary) {
+    el.progressSummary.addEventListener('click', function (event) {
+      var openBtn = event.target.closest('[data-open-app]');
+      if (!openBtn) { return; }
+      event.preventDefault();
+      var openKey = openBtn.getAttribute('data-open-app');
+      api('/api/open', { method: 'POST', body: { app: openKey } }).catch(function (error) {
+        showBanner('Could not open download page: ' + escapeHtml(error.message || 'unknown error'), 'err');
+      });
+    });
+  }
 
   // ---------------------------------------------------------------- boot
 

@@ -917,7 +917,37 @@ code {
 
 .step-log:empty::after { content: "No output yet."; color: var(--text-faint); }
 
-.manual-actions { padding: 12px 14px; border-top: 1px solid var(--border); }
+.manual-actions {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.manual-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.manual-guide-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.manual-actions .manual-open-btn,
+.progress-summary .manual-open-btn.primary-btn {
+  margin-top: 2px;
+}
+
+.progress-summary .manual-open-btn.link-btn {
+  display: inline;
+  margin-left: 6px;
+  padding: 0;
+  vertical-align: baseline;
+}
 
 .progress-summary {
   margin-top: 16px;

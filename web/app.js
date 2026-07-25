@@ -627,8 +627,32 @@
       pollIsoJob(card, data.jobId);
       loadActivity();
     }).catch(function (error) {
+      var msg = error.message || 'Could not start download';
+      // Server said the file is busy — reconnect UI to the existing job.
+      if (/already downloading/i.test(msg)) {
+        setIsoStatus(card, 'Reconnecting to download in progress…');
+        api('/api/activity').then(function (data) {
+          renderActivity(data || { installs: [], isos: [], activeCount: 0 });
+          var match = (data.isos || []).filter(function (item) {
+            return item.key === key && (item.state === 'running' || item.state === 'queued' || item.alive);
+          })[0];
+          if (match && match.jobId) {
+            attachIsoJobToCard(key, match.jobId, {
+              message: match.message || 'Downloading…',
+              percent: match.percent
+            });
+            return;
+          }
+          setIsoStatus(card, msg, 'err');
+          btn.disabled = false;
+        }).catch(function () {
+          setIsoStatus(card, msg, 'err');
+          btn.disabled = false;
+        });
+        return;
+      }
       setIsoProgress(card, null);
-      setIsoStatus(card, error.message || 'Could not start download', 'err');
+      setIsoStatus(card, msg, 'err');
       btn.disabled = false;
     });
   }

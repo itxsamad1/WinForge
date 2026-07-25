@@ -142,6 +142,40 @@ function Test-IsoProcessAlive {
     }
 }
 
+function Test-PathBusy {
+    param([string]$Path)
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path)) { return $false }
+    try {
+        $fs = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+        $fs.Dispose()
+        return $false
+    } catch {
+        return $true
+    }
+}
+
+function Get-IsoPartialCandidates {
+    param($Plan, $Status, [string]$DestDir, [string]$File)
+    $paths = @()
+    if (-not [string]::IsNullOrWhiteSpace($DestDir) -and -not [string]::IsNullOrWhiteSpace($File)) {
+        $paths += (Join-Path $DestDir ($File + '.partial'))
+    }
+    if ($null -ne $Plan) {
+        $planFile = Get-Prop $Plan 'file'
+        $planDest = Get-Prop $Plan 'destDir'
+        if (-not [string]::IsNullOrWhiteSpace($planDest) -and -not [string]::IsNullOrWhiteSpace($planFile)) {
+            $paths += (Join-Path $planDest ($planFile + '.partial'))
+        }
+    }
+    if ($null -ne $Status) {
+        $destPath = Get-Prop $Status 'destPath'
+        if (-not [string]::IsNullOrWhiteSpace($destPath)) {
+            $paths += ($destPath + '.partial')
+        }
+    }
+    return @($paths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+}
+
 function Find-ActiveIsoJob {
     <#
         Returns an in-flight ISO job for the same OS key / file so a page reload
@@ -159,6 +193,7 @@ function Find-ActiveIsoJob {
 
     $dirs = Get-ChildItem -LiteralPath $jobsRoot -Directory -ErrorAction SilentlyContinue |
         Sort-Object LastWriteTime -Descending
+
     foreach ($dir in $dirs) {
         if ($dir.Name -notmatch '^[a-f0-9]{12}$') { continue }
         $plan = Read-JsonFile -Path (Join-Path $dir.FullName 'plan.json')
@@ -169,51 +204,45 @@ function Find-ActiveIsoJob {
         $planFile = Get-Prop $plan 'file'
         if ($planKey -ne $Key) { continue }
         if (-not [string]::IsNullOrWhiteSpace($File) -and $planFile -ne $File) { continue }
-        if (-not [string]::IsNullOrWhiteSpace($DestDir)) {
-            $planDest = Get-Prop $plan 'destDir'
-            if (-not [string]::IsNullOrWhiteSpace($planDest) -and
-                ([IO.Path]::GetFullPath($planDest) -ne [IO.Path]::GetFullPath($DestDir))) {
-                continue
-            }
-        }
 
         $state = if ($null -ne $status) { Get-Prop $status 'state' } else { 'unknown' }
         $pidValue = if ($null -ne $status) { Get-Prop $status 'pid' } else { $null }
         $alive = Test-IsoProcessAlive -PidValue $pidValue
-        $partialPath = $null
-        if (-not [string]::IsNullOrWhiteSpace($DestDir) -and -not [string]::IsNullOrWhiteSpace($planFile)) {
-            $partialPath = Join-Path $DestDir ($planFile + '.partial')
-        } elseif ($null -ne $status) {
-            $destPath = Get-Prop $status 'destPath'
-            if (-not [string]::IsNullOrWhiteSpace($destPath)) { $partialPath = "$destPath.partial" }
-        }
+
+        $fileForPartial = if (-not [string]::IsNullOrWhiteSpace($File)) { $File } else { $planFile }
         $partialBusy = $false
-        if (-not [string]::IsNullOrWhiteSpace($partialPath) -and (Test-Path -LiteralPath $partialPath)) {
-            try {
-                $fs = [System.IO.File]::Open($partialPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
-                $fs.Dispose()
-            } catch {
-                $partialBusy = $true
+        $partialExists = $false
+        foreach ($partialPath in (Get-IsoPartialCandidates -Plan $plan -Status $status -DestDir $DestDir -File $fileForPartial)) {
+            if (Test-Path -LiteralPath $partialPath) { $partialExists = $true }
+            if (Test-PathBusy -Path $partialPath) { $partialBusy = $true }
+        }
+
+        $recentRunning = $false
+        if ($state -eq 'running' -and $partialExists -and $null -ne $status) {
+            $started = Get-Prop $status 'startedAt'
+            if (-not [string]::IsNullOrWhiteSpace($started)) {
+                try {
+                    $ageMin = ((Get-Date) - [datetime]::Parse($started)).TotalMinutes
+                    if ($ageMin -ge 0 -and $ageMin -lt 180) { $recentRunning = $true }
+                } catch { }
             }
         }
 
-        if (-not $alive -and -not $partialBusy) { continue }
+        if (-not $alive -and -not $partialBusy -and -not $recentRunning) { continue }
 
-        # Heal a failed/stale status while the downloader is still alive.
-        if ($null -ne $status -and $alive -and $state -ne 'running') {
+        if ($null -ne $status -and ($alive -or $partialBusy -or $recentRunning) -and $state -ne 'running') {
             $status.state = 'running'
-            if ([string]::IsNullOrWhiteSpace((Get-Prop $status 'message'))) {
-                $status.message = 'Downloading'
-            }
+            $status.message = Get-Prop $status 'message' 'Downloading'
+            $status.key = $planKey
             try { Write-JsonFile -Path (Join-Path $dir.FullName 'status.json') -Value $status } catch { }
         }
 
         return [pscustomobject]@{
-            jobId   = $dir.Name
-            destDir = Get-Prop $plan 'destDir'
-            name    = Get-Prop $plan 'name' (Get-Prop $status 'name' 'ISO')
-            file    = $planFile
-            key     = $planKey
+            jobId      = $dir.Name
+            destDir    = Get-Prop $plan 'destDir' $DestDir
+            name       = Get-Prop $plan 'name' (Get-Prop $status 'name' 'ISO')
+            file       = $planFile
+            key        = $planKey
             reattached = $true
         }
     }

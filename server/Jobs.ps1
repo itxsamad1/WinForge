@@ -232,8 +232,35 @@ function Get-ActivitySnapshot {
                     $alive = ($null -ne $proc -and -not $proc.HasExited)
                 } catch { $alive = $false }
             }
-            if ($alive -and $state -notin @('running', 'queued')) {
+
+            $partialBusy = $false
+            $destPath = if ($null -ne $status) { Get-Prop $status 'destPath' } else { $null }
+            if ([string]::IsNullOrWhiteSpace($destPath) -and $null -ne $plan) {
+                $pf = Get-Prop $plan 'file'
+                $pd = Get-Prop $plan 'destDir'
+                if (-not [string]::IsNullOrWhiteSpace($pf) -and -not [string]::IsNullOrWhiteSpace($pd)) {
+                    $destPath = Join-Path $pd $pf
+                }
+            }
+            if (-not [string]::IsNullOrWhiteSpace($destPath)) {
+                $partialPath = $destPath + '.partial'
+                if (Test-Path -LiteralPath $partialPath) {
+                    try {
+                        $fs = [System.IO.File]::Open($partialPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+                        $fs.Dispose()
+                    } catch {
+                        $partialBusy = $true
+                    }
+                }
+            }
+
+            if (($alive -or $partialBusy) -and $state -notin @('running', 'queued')) {
                 $state = 'running'
+            }
+
+            $message = if ($null -ne $status) { Get-Prop $status 'message' } else { $null }
+            if ([string]::IsNullOrWhiteSpace($message) -and ($alive -or $partialBusy)) {
+                $message = 'Downloading'
             }
 
             $isos += [pscustomobject]@{
@@ -244,9 +271,9 @@ function Get-ActivitySnapshot {
                 name     = if ($null -ne $status) { Get-Prop $status 'name' 'ISO download' } else { Get-Prop $plan 'name' 'ISO download' }
                 detail   = if ($null -ne $status) { Get-Prop $status 'speed' } else { $null }
                 percent  = if ($null -ne $status) { Get-Prop $status 'percent' } else { $null }
-                message  = if ($null -ne $status) { Get-Prop $status 'message' } else { 'Downloading' }
-                destPath = if ($null -ne $status) { Get-Prop $status 'destPath' } else { $null }
-                alive    = $alive
+                message  = $message
+                destPath = $destPath
+                alive    = ($alive -or $partialBusy)
             }
         }
     }

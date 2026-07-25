@@ -1,0 +1,40 @@
+{
+  "presets": [
+    {
+      "key": "essentials",
+      "name": "Essentials",
+      "description": "The baseline every developer machine needs.",
+      "apps": ["git", "vscode", "windows-terminal", "powershell-7", "chrome", "7zip", "powertoys"]
+    },
+    {
+      "key": "web",
+      "name": "Web Dev",
+      "description": "Node, package managers, editor, API client and browsers.",
+      "apps": ["git", "nvm-windows", "vscode", "cursor", "windows-terminal", "powershell-7", "postman", "chrome", "firefox-dev", "github-cli"]
+    },
+    {
+      "key": "mobile",
+      "name": "Android / Mobile",
+      "description": "Android Studio with the JDK and SDK environment wired up.",
+      "apps": ["git", "temurin-21", "android-studio", "flutter", "vscode", "windows-terminal"]
+    },
+    {
+      "key": "python-ai",
+      "name": "Python & AI",
+      "description": "Python toolchain plus local model runners.",
+      "apps": ["git", "python-313", "uv", "vscode", "cursor", "windows-terminal", "ollama", "lm-studio"]
+    },
+    {
+      "key": "backend",
+      "name": "Backend & DevOps",
+      "description": "Containers, Kubernetes, cloud CLIs and a database client.",
+      "apps": ["git", "docker-desktop", "kubectl", "helm", "terraform", "postgresql", "dbeaver", "windows-terminal", "powershell-7"]
+    },
+    {
+      "key": "media",
+      "name": "Design & Media",
+      "description": "Editing, capture and encoding tools.",
+      "apps": ["creative-cloud", "figma", "obs-studio", "davinci-resolve", "ffmpeg", "handbrake", "vlc", "sharex"]
+    }
+  ]
+}

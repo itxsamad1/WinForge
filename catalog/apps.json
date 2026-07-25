@@ -1,0 +1,864 @@
+{
+  "$schema": "./apps.schema.json",
+  "categories": [
+    { "id": "editors",   "name": "Editors & IDEs",        "icon": "code" },
+    { "id": "runtimes",  "name": "Languages & Runtimes",  "icon": "terminal" },
+    { "id": "vcs",       "name": "Version Control",       "icon": "branch" },
+    { "id": "shells",    "name": "Terminals & Shells",    "icon": "prompt" },
+    { "id": "cloud",     "name": "Containers & Cloud",    "icon": "cloud" },
+    { "id": "databases", "name": "Databases",             "icon": "database" },
+    { "id": "api",       "name": "API & Networking",      "icon": "plug" },
+    { "id": "ai",        "name": "AI & Local Models",     "icon": "spark" },
+    { "id": "design",    "name": "Design & Media",        "icon": "palette" },
+    { "id": "browsers",  "name": "Browsers",              "icon": "globe" },
+    { "id": "utilities", "name": "Utilities",             "icon": "tools" },
+    { "id": "comms",     "name": "Communication",         "icon": "chat" }
+  ],
+  "apps": [
+    {
+      "key": "vscode",
+      "name": "Visual Studio Code",
+      "id": "Microsoft.VisualStudioCode",
+      "category": "editors",
+      "description": "Microsoft's extensible code editor.",
+      "popular": true,
+      "override": "/VERYSILENT /MERGETASKS=\"!runcode,addcontextmenufiles,addcontextmenufolders,associatewithfiles,addtopath\"",
+      "postInstall": ["vscode-extensions"],
+      "detect": { "cmd": "code", "registry": "^Microsoft Visual Studio Code" }
+    },
+    {
+      "key": "cursor",
+      "name": "Cursor",
+      "id": "Anysphere.Cursor",
+      "category": "editors",
+      "description": "AI-first code editor built on VS Code.",
+      "popular": true,
+      "postInstall": ["cursor-extensions"],
+      "detect": { "cmd": "cursor", "registry": "^Cursor" }
+    },
+    {
+      "key": "android-studio",
+      "name": "Android Studio",
+      "id": "Google.AndroidStudio",
+      "category": "editors",
+      "description": "Official IDE for Android development.",
+      "popular": true,
+      "postInstall": ["android-env"],
+      "after": ["temurin-21"],
+      "detect": { "registry": "^Android Studio", "path": "%ProgramFiles%\\Android\\Android Studio\\bin\\studio64.exe" }
+    },
+    {
+      "key": "visualstudio-community",
+      "name": "Visual Studio 2022 Community",
+      "id": "Microsoft.VisualStudio.2022.Community",
+      "category": "editors",
+      "description": "Full .NET and C++ IDE. Large download.",
+      "notes": "Several GB. Workloads are chosen inside the installer afterwards.",
+      "detect": { "registry": "^Visual Studio Community 2022" }
+    },
+    {
+      "key": "jetbrains-toolbox",
+      "name": "JetBrains Toolbox",
+      "id": "JetBrains.Toolbox",
+      "category": "editors",
+      "description": "Manages all JetBrains IDEs from one place.",
+      "detect": { "registry": "^JetBrains Toolbox" }
+    },
+    {
+      "key": "intellij-community",
+      "name": "IntelliJ IDEA Community",
+      "id": "JetBrains.IntelliJIDEA.Community",
+      "category": "editors",
+      "description": "Java and Kotlin IDE.",
+      "after": ["temurin-21"],
+      "detect": { "registry": "^IntelliJ IDEA Community" }
+    },
+    {
+      "key": "pycharm-community",
+      "name": "PyCharm Community",
+      "id": "JetBrains.PyCharm.Community",
+      "category": "editors",
+      "description": "Python IDE from JetBrains.",
+      "detect": { "registry": "^PyCharm Community" }
+    },
+    {
+      "key": "webstorm",
+      "name": "WebStorm",
+      "id": "JetBrains.WebStorm",
+      "category": "editors",
+      "description": "JavaScript and TypeScript IDE. Paid licence.",
+      "detect": { "registry": "^WebStorm" }
+    },
+    {
+      "key": "sublime-text",
+      "name": "Sublime Text",
+      "id": "SublimeHQ.SublimeText.4",
+      "category": "editors",
+      "description": "Fast native text editor.",
+      "detect": { "cmd": "subl", "registry": "^Sublime Text" }
+    },
+    {
+      "key": "notepadplusplus",
+      "name": "Notepad++",
+      "id": "Notepad++.Notepad++",
+      "category": "editors",
+      "description": "Lightweight editor for quick edits.",
+      "detect": { "registry": "^Notepad\\+\\+" }
+    },
+    {
+      "key": "neovim",
+      "name": "Neovim",
+      "id": "Neovim.Neovim",
+      "category": "editors",
+      "description": "Modern Vim, terminal based.",
+      "detect": { "cmd": "nvim", "registry": "^Neovim" }
+    },
+
+    {
+      "key": "node-lts",
+      "name": "Node.js (LTS)",
+      "id": "OpenJS.NodeJS.LTS",
+      "category": "runtimes",
+      "description": "JavaScript runtime with npm included.",
+      "popular": true,
+      "postInstall": ["enable-corepack"],
+      "after": ["nvm-windows"],
+      "notes": "Skip this if you install nvm and manage Node versions with it.",
+      "detect": { "cmd": "node", "registry": "^Node\\.js" }
+    },
+    {
+      "key": "nvm-windows",
+      "name": "nvm for Windows",
+      "id": "CoreyButler.NVMforWindows",
+      "category": "runtimes",
+      "description": "Install and switch between multiple Node versions.",
+      "popular": true,
+      "postInstall": ["nvm-lts"],
+      "notes": "Installs the latest Node LTS through nvm automatically.",
+      "detect": { "cmd": "nvm", "registry": "^NVM for Windows" }
+    },
+    {
+      "key": "python-313",
+      "name": "Python 3.13",
+      "id": "Python.Python.3.13",
+      "category": "runtimes",
+      "description": "Python interpreter plus pip and the py launcher.",
+      "popular": true,
+      "postInstall": ["python-pip"],
+      "detect": { "cmd": "python", "registry": "^Python 3\\.13" }
+    },
+    {
+      "key": "uv",
+      "name": "uv",
+      "id": "astral-sh.uv",
+      "category": "runtimes",
+      "description": "Extremely fast Python package and project manager.",
+      "detect": { "cmd": "uv" }
+    },
+    {
+      "key": "temurin-21",
+      "name": "Java JDK 21 (Temurin)",
+      "id": "EclipseAdoptium.Temurin.21.JDK",
+      "category": "runtimes",
+      "description": "Long-term-support OpenJDK build.",
+      "popular": true,
+      "postInstall": ["java-home"],
+      "detect": { "cmd": "java", "registry": "^Eclipse Temurin JDK.*21" }
+    },
+    {
+      "key": "temurin-17",
+      "name": "Java JDK 17 (Temurin)",
+      "id": "EclipseAdoptium.Temurin.17.JDK",
+      "category": "runtimes",
+      "description": "Previous LTS JDK, still required by many Android and Gradle builds.",
+      "detect": { "registry": "^Eclipse Temurin JDK.*17" }
+    },
+    {
+      "key": "dotnet-sdk-8",
+      "name": ".NET SDK 8",
+      "id": "Microsoft.DotNet.SDK.8",
+      "category": "runtimes",
+      "description": "Build C# and F# apps.",
+      "detect": { "cmd": "dotnet", "registry": "^Microsoft \\.NET SDK 8" }
+    },
+    {
+      "key": "go",
+      "name": "Go",
+      "id": "GoLang.Go",
+      "category": "runtimes",
+      "description": "The Go programming language toolchain.",
+      "detect": { "cmd": "go", "registry": "^Go Programming Language" }
+    },
+    {
+      "key": "rustup",
+      "name": "Rust (rustup)",
+      "id": "Rustlang.Rustup",
+      "category": "runtimes",
+      "description": "Rust toolchain installer, gives you cargo and rustc.",
+      "detect": { "cmd": "rustup", "registry": "^Rustup" }
+    },
+    {
+      "key": "bun",
+      "name": "Bun",
+      "id": "Oven-sh.Bun",
+      "category": "runtimes",
+      "description": "Fast JavaScript runtime, bundler and package manager.",
+      "detect": { "cmd": "bun" }
+    },
+    {
+      "key": "deno",
+      "name": "Deno",
+      "id": "DenoLand.Deno",
+      "category": "runtimes",
+      "description": "Secure TypeScript-first JavaScript runtime.",
+      "detect": { "cmd": "deno" }
+    },
+    {
+      "key": "php",
+      "name": "PHP 8.3",
+      "id": "PHP.PHP.8.3",
+      "category": "runtimes",
+      "description": "PHP command line interpreter.",
+      "detect": { "cmd": "php" }
+    },
+    {
+      "key": "ruby",
+      "name": "Ruby 3.3",
+      "id": "RubyInstallerTeam.Ruby.3.3",
+      "category": "runtimes",
+      "description": "Ruby interpreter with the RubyInstaller toolchain.",
+      "detect": { "cmd": "ruby", "registry": "^Ruby 3\\.3" }
+    },
+    {
+      "key": "flutter",
+      "name": "Flutter SDK",
+      "kind": "script",
+      "command": "flutter-sdk",
+      "category": "runtimes",
+      "description": "Cross-platform UI toolkit from Google.",
+      "after": ["git", "android-studio"],
+      "notes": "Google does not publish Flutter to winget, so this clones the stable SDK to C:\\src\\flutter and puts it on PATH. Around 1 GB.",
+      "detect": { "cmd": "flutter" }
+    },
+    {
+      "key": "cmake",
+      "name": "CMake",
+      "id": "Kitware.CMake",
+      "category": "runtimes",
+      "description": "Cross-platform build system generator.",
+      "detect": { "cmd": "cmake", "registry": "^CMake" }
+    },
+    {
+      "key": "llvm",
+      "name": "LLVM / Clang",
+      "id": "LLVM.LLVM",
+      "category": "runtimes",
+      "description": "Clang compiler and LLVM toolchain.",
+      "detect": { "cmd": "clang", "registry": "^LLVM" }
+    },
+
+    {
+      "key": "git",
+      "name": "Git",
+      "id": "Git.Git",
+      "category": "vcs",
+      "description": "Distributed version control. Everything else assumes it.",
+      "popular": true,
+      "postInstall": ["git-config"],
+      "detect": { "cmd": "git", "registry": "^Git$|^Git version" }
+    },
+    {
+      "key": "github-cli",
+      "name": "GitHub CLI",
+      "id": "GitHub.cli",
+      "category": "vcs",
+      "description": "Work with pull requests and issues from the terminal.",
+      "after": ["git"],
+      "detect": { "cmd": "gh", "registry": "^GitHub CLI" }
+    },
+    {
+      "key": "github-desktop",
+      "name": "GitHub Desktop",
+      "id": "GitHub.GitHubDesktop",
+      "category": "vcs",
+      "description": "Graphical Git client from GitHub.",
+      "after": ["git"],
+      "detect": { "registry": "^GitHub Desktop" }
+    },
+    {
+      "key": "gitkraken",
+      "name": "GitKraken",
+      "id": "Axosoft.GitKraken",
+      "category": "vcs",
+      "description": "Cross-platform Git GUI with a visual commit graph.",
+      "detect": { "registry": "^GitKraken" }
+    },
+    {
+      "key": "tortoisegit",
+      "name": "TortoiseGit",
+      "id": "TortoiseGit.TortoiseGit",
+      "category": "vcs",
+      "description": "Git integration in Windows Explorer.",
+      "after": ["git"],
+      "detect": { "registry": "^TortoiseGit" }
+    },
+    {
+      "key": "git-lfs",
+      "name": "Git LFS",
+      "id": "GitHub.GitLFS",
+      "category": "vcs",
+      "description": "Large file storage extension for Git.",
+      "after": ["git"],
+      "detect": { "cmd": "git-lfs" }
+    },
+
+    {
+      "key": "windows-terminal",
+      "name": "Windows Terminal",
+      "id": "Microsoft.WindowsTerminal",
+      "category": "shells",
+      "description": "Tabbed terminal with GPU rendering.",
+      "popular": true,
+      "detect": { "path": "%LOCALAPPDATA%\\Microsoft\\WindowsApps\\wt.exe" }
+    },
+    {
+      "key": "powershell-7",
+      "name": "PowerShell 7",
+      "id": "Microsoft.PowerShell",
+      "category": "shells",
+      "description": "Modern cross-platform PowerShell.",
+      "popular": true,
+      "detect": { "cmd": "pwsh", "registry": "^PowerShell 7" }
+    },
+    {
+      "key": "oh-my-posh",
+      "name": "Oh My Posh",
+      "id": "JanDeDobbeleer.OhMyPosh",
+      "category": "shells",
+      "description": "Prompt theme engine for any shell.",
+      "detect": { "cmd": "oh-my-posh" }
+    },
+    {
+      "key": "starship",
+      "name": "Starship",
+      "id": "Starship.Starship",
+      "category": "shells",
+      "description": "Minimal, fast, customisable shell prompt.",
+      "detect": { "cmd": "starship" }
+    },
+    {
+      "key": "wsl",
+      "name": "WSL (Ubuntu)",
+      "kind": "script",
+      "command": "wsl-ubuntu",
+      "category": "shells",
+      "description": "Windows Subsystem for Linux with Ubuntu.",
+      "requiresRestart": true,
+      "notes": "Enables Windows features and needs a reboot before first launch.",
+      "detect": { "cmd": "wsl" }
+    },
+    {
+      "key": "fzf",
+      "name": "fzf",
+      "id": "junegunn.fzf",
+      "category": "shells",
+      "description": "Command line fuzzy finder.",
+      "detect": { "cmd": "fzf" }
+    },
+    {
+      "key": "ripgrep",
+      "name": "ripgrep",
+      "id": "BurntSushi.ripgrep.MSVC",
+      "category": "shells",
+      "description": "Very fast recursive search, the engine behind many editors.",
+      "detect": { "cmd": "rg" }
+    },
+    {
+      "key": "jq",
+      "name": "jq",
+      "id": "jqlang.jq",
+      "category": "shells",
+      "description": "Command line JSON processor.",
+      "detect": { "cmd": "jq" }
+    },
+
+    {
+      "key": "docker-desktop",
+      "name": "Docker Desktop",
+      "id": "Docker.DockerDesktop",
+      "category": "cloud",
+      "description": "Containers on Windows, with a WSL2 backend.",
+      "popular": true,
+      "requiresRestart": true,
+      "notes": "Needs WSL2 and a reboot before the engine starts.",
+      "detect": { "cmd": "docker", "registry": "^Docker Desktop" }
+    },
+    {
+      "key": "kubectl",
+      "name": "kubectl",
+      "id": "Kubernetes.kubectl",
+      "category": "cloud",
+      "description": "Kubernetes command line client.",
+      "detect": { "cmd": "kubectl" }
+    },
+    {
+      "key": "helm",
+      "name": "Helm",
+      "id": "Helm.Helm",
+      "category": "cloud",
+      "description": "Package manager for Kubernetes.",
+      "detect": { "cmd": "helm" }
+    },
+    {
+      "key": "terraform",
+      "name": "Terraform",
+      "id": "Hashicorp.Terraform",
+      "category": "cloud",
+      "description": "Infrastructure as code.",
+      "detect": { "cmd": "terraform" }
+    },
+    {
+      "key": "aws-cli",
+      "name": "AWS CLI",
+      "id": "Amazon.AWSCLI",
+      "category": "cloud",
+      "description": "Command line access to AWS services.",
+      "detect": { "cmd": "aws", "registry": "^AWS Command Line Interface" }
+    },
+    {
+      "key": "azure-cli",
+      "name": "Azure CLI",
+      "id": "Microsoft.AzureCLI",
+      "category": "cloud",
+      "description": "Command line access to Azure.",
+      "detect": { "cmd": "az", "registry": "^Microsoft Azure CLI" }
+    },
+    {
+      "key": "gcloud",
+      "name": "Google Cloud CLI",
+      "id": "Google.CloudSDK",
+      "category": "cloud",
+      "description": "gcloud command line tools.",
+      "detect": { "cmd": "gcloud", "registry": "^Google Cloud (SDK|CLI)" }
+    },
+    {
+      "key": "ngrok",
+      "name": "ngrok",
+      "id": "Ngrok.Ngrok",
+      "category": "cloud",
+      "description": "Expose a local port to the public internet.",
+      "detect": { "cmd": "ngrok" }
+    },
+    {
+      "key": "cloudflared",
+      "name": "Cloudflare Tunnel",
+      "id": "Cloudflare.cloudflared",
+      "category": "cloud",
+      "description": "Tunnel local services through Cloudflare.",
+      "detect": { "cmd": "cloudflared" }
+    },
+
+    {
+      "key": "postgresql",
+      "name": "PostgreSQL 17",
+      "id": "PostgreSQL.PostgreSQL.17",
+      "category": "databases",
+      "description": "Relational database server plus tools.",
+      "notes": "PostgreSQL 16's EnterpriseDB download often returns HTTP 403 via winget, so this catalog ships 17 instead.",
+      "detect": { "cmd": "psql", "registry": "^PostgreSQL 17" }
+    },
+    {
+      "key": "mysql",
+      "name": "MySQL Server",
+      "id": "Oracle.MySQL",
+      "category": "databases",
+      "description": "MySQL community database server.",
+      "detect": { "cmd": "mysql", "registry": "^MySQL Server" }
+    },
+    {
+      "key": "mongodb",
+      "name": "MongoDB Server",
+      "id": "MongoDB.Server",
+      "category": "databases",
+      "description": "Document database server.",
+      "detect": { "registry": "^MongoDB" }
+    },
+    {
+      "key": "mongodb-compass",
+      "name": "MongoDB Compass",
+      "id": "MongoDB.Compass.Full",
+      "category": "databases",
+      "description": "GUI for browsing MongoDB data.",
+      "detect": { "registry": "^MongoDB Compass" }
+    },
+    {
+      "key": "dbeaver",
+      "name": "DBeaver Community",
+      "id": "DBeaver.DBeaver.Community",
+      "category": "databases",
+      "description": "Universal database client for almost any engine.",
+      "after": ["temurin-21"],
+      "detect": { "registry": "^DBeaver" }
+    },
+    {
+      "key": "sqlite",
+      "name": "SQLite tools",
+      "id": "SQLite.SQLite",
+      "category": "databases",
+      "description": "SQLite command line shell.",
+      "detect": { "cmd": "sqlite3" }
+    },
+    {
+      "key": "ssms",
+      "name": "SQL Server Management Studio",
+      "id": "Microsoft.SQLServerManagementStudio",
+      "category": "databases",
+      "description": "Management GUI for SQL Server.",
+      "detect": { "registry": "^SQL Server Management Studio" }
+    },
+    {
+      "key": "redis-insight",
+      "name": "RedisInsight",
+      "id": "RedisInsight.RedisInsight",
+      "category": "databases",
+      "description": "GUI client for Redis.",
+      "detect": { "registry": "^RedisInsight" }
+    },
+
+    {
+      "key": "postman",
+      "name": "Postman",
+      "id": "Postman.Postman",
+      "category": "api",
+      "description": "Build and test HTTP APIs.",
+      "popular": true,
+      "detect": { "registry": "^Postman" }
+    },
+    {
+      "key": "insomnia",
+      "name": "Insomnia",
+      "id": "Insomnia.Insomnia",
+      "category": "api",
+      "description": "Lightweight REST and GraphQL client.",
+      "detect": { "registry": "^Insomnia" }
+    },
+    {
+      "key": "bruno",
+      "name": "Bruno",
+      "id": "Bruno.Bruno",
+      "category": "api",
+      "description": "Offline, git-friendly API client.",
+      "detect": { "registry": "^Bruno" }
+    },
+    {
+      "key": "wireshark",
+      "name": "Wireshark",
+      "id": "WiresharkFoundation.Wireshark",
+      "category": "api",
+      "description": "Network protocol analyser.",
+      "detect": { "registry": "^Wireshark" }
+    },
+    {
+      "key": "curl",
+      "name": "curl",
+      "id": "cURL.cURL",
+      "category": "api",
+      "description": "The standard HTTP command line tool.",
+      "detect": { "cmd": "curl" }
+    },
+    {
+      "key": "winscp",
+      "name": "WinSCP",
+      "id": "WinSCP.WinSCP",
+      "category": "api",
+      "description": "SFTP and FTP client for Windows.",
+      "detect": { "registry": "^WinSCP" }
+    },
+    {
+      "key": "putty",
+      "name": "PuTTY",
+      "id": "PuTTY.PuTTY",
+      "category": "api",
+      "description": "Classic SSH and serial terminal client.",
+      "detect": { "cmd": "putty", "registry": "^PuTTY" }
+    },
+
+    {
+      "key": "ollama",
+      "name": "Ollama",
+      "id": "Ollama.Ollama",
+      "category": "ai",
+      "description": "Run large language models locally from the terminal.",
+      "detect": { "cmd": "ollama", "registry": "^Ollama" }
+    },
+    {
+      "key": "lm-studio",
+      "name": "LM Studio",
+      "id": "ElementLabs.LMStudio",
+      "category": "ai",
+      "description": "Desktop app for downloading and chatting with local models.",
+      "detect": { "registry": "^LM Studio" }
+    },
+    {
+      "key": "claude-desktop",
+      "name": "Claude",
+      "id": "Anthropic.Claude",
+      "category": "ai",
+      "description": "Official Claude desktop app.",
+      "detect": { "registry": "^Claude" }
+    },
+
+    {
+      "key": "creative-cloud",
+      "name": "Adobe Creative Cloud",
+      "id": "Adobe.CreativeCloud",
+      "category": "design",
+      "description": "Installer hub for Photoshop, Premiere Pro, After Effects and the rest.",
+      "notes": "Adobe apps are not on winget individually. Install this, sign in, then pick the apps you want inside it.",
+      "detect": { "registry": "^Adobe Creative Cloud" }
+    },
+    {
+      "key": "premiere-pro",
+      "name": "Adobe Premiere Pro",
+      "kind": "manual",
+      "category": "design",
+      "url": "https://creativecloud.adobe.com/apps/download/premiere-pro",
+      "after": ["creative-cloud"],
+      "description": "Video editing. Only installable through Creative Cloud.",
+      "instructions": "Adobe does not publish Premiere Pro to winget. Install Adobe Creative Cloud (also in this catalog), sign in with your Adobe account, then install Premiere Pro from the Apps tab. The button below opens the download page.",
+      "detect": { "registry": "^Adobe Premiere Pro" }
+    },
+    {
+      "key": "figma",
+      "name": "Figma",
+      "id": "Figma.Figma",
+      "category": "design",
+      "description": "Interface design and prototyping.",
+      "detect": { "registry": "^Figma" }
+    },
+    {
+      "key": "blender",
+      "name": "Blender",
+      "id": "BlenderFoundation.Blender",
+      "category": "design",
+      "description": "3D modelling, animation and rendering.",
+      "detect": { "registry": "^Blender" }
+    },
+    {
+      "key": "gimp",
+      "name": "GIMP",
+      "id": "GIMP.GIMP.3",
+      "category": "design",
+      "description": "Free raster image editor.",
+      "detect": { "registry": "^GIMP" }
+    },
+    {
+      "key": "inkscape",
+      "name": "Inkscape",
+      "id": "Inkscape.Inkscape",
+      "category": "design",
+      "description": "Vector graphics editor.",
+      "detect": { "registry": "^Inkscape" }
+    },
+    {
+      "key": "obs-studio",
+      "name": "OBS Studio",
+      "id": "OBSProject.OBSStudio",
+      "category": "design",
+      "description": "Screen recording and live streaming.",
+      "detect": { "registry": "^OBS Studio" }
+    },
+    {
+      "key": "davinci-resolve",
+      "name": "DaVinci Resolve",
+      "kind": "manual",
+      "category": "design",
+      "url": "https://www.blackmagicdesign.com/products/davinciresolve",
+      "description": "Professional video editing and colour grading, free tier.",
+      "instructions": "Blackmagic requires a registration form before download, so this one cannot be automated. The button below opens the download page; pick 'DaVinci Resolve' under the Windows column.",
+      "detect": { "registry": "^DaVinci Resolve" }
+    },
+    {
+      "key": "audacity",
+      "name": "Audacity",
+      "id": "Audacity.Audacity",
+      "category": "design",
+      "description": "Audio recording and editing.",
+      "detect": { "registry": "^Audacity" }
+    },
+    {
+      "key": "handbrake",
+      "name": "HandBrake",
+      "id": "HandBrake.HandBrake",
+      "category": "design",
+      "description": "Video transcoder with sensible presets.",
+      "detect": { "registry": "^HandBrake" }
+    },
+    {
+      "key": "ffmpeg",
+      "name": "FFmpeg",
+      "id": "Gyan.FFmpeg",
+      "category": "design",
+      "description": "The command line media swiss army knife.",
+      "detect": { "cmd": "ffmpeg" }
+    },
+    {
+      "key": "vlc",
+      "name": "VLC",
+      "id": "VideoLAN.VLC",
+      "category": "design",
+      "description": "Plays essentially any media file.",
+      "detect": { "registry": "^VLC media player" }
+    },
+
+    {
+      "key": "chrome",
+      "name": "Google Chrome",
+      "id": "Google.Chrome",
+      "category": "browsers",
+      "description": "Chrome with DevTools.",
+      "popular": true,
+      "detect": { "registry": "^Google Chrome" }
+    },
+    {
+      "key": "firefox",
+      "name": "Firefox",
+      "id": "Mozilla.Firefox",
+      "category": "browsers",
+      "description": "Mozilla's browser.",
+      "detect": { "registry": "^Mozilla Firefox" }
+    },
+    {
+      "key": "firefox-dev",
+      "name": "Firefox Developer Edition",
+      "id": "Mozilla.Firefox.DeveloperEdition",
+      "category": "browsers",
+      "description": "Firefox build aimed at web developers.",
+      "detect": { "registry": "^Firefox Developer Edition" }
+    },
+    {
+      "key": "brave",
+      "name": "Brave",
+      "id": "Brave.Brave",
+      "category": "browsers",
+      "description": "Chromium browser with built-in blocking.",
+      "detect": { "registry": "^Brave" }
+    },
+
+    {
+      "key": "powertoys",
+      "name": "PowerToys",
+      "id": "Microsoft.PowerToys",
+      "category": "utilities",
+      "description": "Window management, FancyZones, PowerRename and more.",
+      "popular": true,
+      "detect": { "registry": "^PowerToys" }
+    },
+    {
+      "key": "7zip",
+      "name": "7-Zip",
+      "id": "7zip.7zip",
+      "category": "utilities",
+      "description": "Archive tool that opens everything.",
+      "popular": true,
+      "detect": { "registry": "^7-Zip" }
+    },
+    {
+      "key": "everything",
+      "name": "Everything",
+      "id": "voidtools.Everything",
+      "category": "utilities",
+      "description": "Instant filename search across every drive.",
+      "detect": { "registry": "^Everything" }
+    },
+    {
+      "key": "obsidian",
+      "name": "Obsidian",
+      "id": "Obsidian.Obsidian",
+      "category": "utilities",
+      "description": "Markdown knowledge base stored as local files.",
+      "detect": { "registry": "^Obsidian" }
+    },
+    {
+      "key": "notion",
+      "name": "Notion",
+      "id": "Notion.Notion",
+      "category": "utilities",
+      "description": "Notes, docs and project tracking.",
+      "detect": { "registry": "^Notion" }
+    },
+    {
+      "key": "sharex",
+      "name": "ShareX",
+      "id": "ShareX.ShareX",
+      "category": "utilities",
+      "description": "Screenshots, screen recording and upload automation.",
+      "detect": { "registry": "^ShareX" }
+    },
+    {
+      "key": "autohotkey",
+      "name": "AutoHotkey",
+      "id": "AutoHotkey.AutoHotkey",
+      "category": "utilities",
+      "description": "Scripting language for keyboard and window automation.",
+      "detect": { "registry": "^AutoHotkey" }
+    },
+    {
+      "key": "windirstat",
+      "name": "WizTree",
+      "id": "AntibodySoftware.WizTree",
+      "category": "utilities",
+      "description": "Finds what is eating your disk space, very fast.",
+      "detect": { "registry": "^WizTree" }
+    },
+    {
+      "key": "rufus",
+      "name": "Rufus",
+      "id": "Rufus.Rufus",
+      "category": "utilities",
+      "description": "Create bootable USB drives.",
+      "detect": { "registry": "^Rufus" }
+    },
+    {
+      "key": "nerd-font",
+      "name": "CaskaydiaCove Nerd Font",
+      "id": "DEVCOM.JetBrainsMonoNerdFont",
+      "category": "utilities",
+      "description": "Programming font with icons, needed by Starship and Oh My Posh themes.",
+      "detect": { "path": "%WINDIR%\\Fonts\\JetBrainsMonoNerdFont-Regular.ttf" }
+    },
+
+    {
+      "key": "slack",
+      "name": "Slack",
+      "id": "SlackTechnologies.Slack",
+      "category": "comms",
+      "description": "Team chat.",
+      "detect": { "registry": "^Slack" }
+    },
+    {
+      "key": "discord",
+      "name": "Discord",
+      "id": "Discord.Discord",
+      "category": "comms",
+      "description": "Voice and text chat.",
+      "detect": { "registry": "^Discord" }
+    },
+    {
+      "key": "zoom",
+      "name": "Zoom",
+      "id": "Zoom.Zoom",
+      "category": "comms",
+      "description": "Video meetings.",
+      "detect": { "registry": "^Zoom" }
+    },
+    {
+      "key": "teams",
+      "name": "Microsoft Teams",
+      "id": "Microsoft.Teams",
+      "category": "comms",
+      "description": "Chat and meetings for work accounts.",
+      "detect": { "registry": "^Microsoft Teams" }
+    }
+  ]
+}

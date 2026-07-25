@@ -200,11 +200,13 @@ function Invoke-ApiRoute {
 
             $job = Start-IsoDownloadJob -Context $Context -Variant $variant -DestDir $destDir
             Write-JsonResponse -Response $Response -Value ([pscustomobject]@{
-                mode    = 'download'
-                jobId   = $job.jobId
-                destDir = $job.destDir
-                file    = $job.file
-                name    = $job.name
+                mode       = 'download'
+                jobId      = $job.jobId
+                destDir    = $job.destDir
+                file       = $job.file
+                name       = $job.name
+                key        = Get-Prop $job 'key' $variant.key
+                reattached = [bool](Get-Prop $job 'reattached' $false)
             })
             return
         }

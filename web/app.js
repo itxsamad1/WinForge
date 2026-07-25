@@ -263,7 +263,7 @@
         '<div class="activity-item-bar"><div class="activity-item-fill" style="width:' + Math.max(0, Math.min(100, pct)) + '%"></div></div>';
       var metaClass = 'activity-item-meta ' + activityStateClass(item.state);
       return '<button type="button" class="activity-item" data-kind="' + escapeHtml(item.kind) +
-        '" data-job="' + escapeHtml(item.jobId || '') + '">' +
+        '" data-job="' + escapeHtml(item.jobId || '') + '" data-key="' + escapeHtml(item.key || '') + '">' +
         '<div class="activity-item-top">' +
         '<span class="activity-item-name">' + escapeHtml(item.name || 'Job') + '</span>' +
         '<span class="' + metaClass + '">' + escapeHtml(activityStateLabel(item.state)) +
@@ -481,6 +481,36 @@
         '<span class="group-count">' + ((group.isos && group.isos.length) || group.apps.length) + '</span></div>' +
         body + '</section>';
     }).join('');
+    restoreIsoJobsFromActivity();
+  }
+
+  function attachIsoJobToCard(key, jobId, opts) {
+    opts = opts || {};
+    var card = el.appGroups.querySelector('.iso-card[data-iso="' + CSS.escape(key) + '"]');
+    if (!card) { return; }
+    var btn = card.querySelector('.iso-download');
+    if (btn) { btn.disabled = true; }
+    if (opts.message) { setIsoStatus(card, opts.message); }
+    setIsoProgress(card, typeof opts.percent === 'number' ? opts.percent : 1);
+    if (isoJobs[key] && isoJobs[key].timer) { clearTimeout(isoJobs[key].timer); }
+    isoJobs[key] = { jobId: jobId, timer: null };
+    pollIsoJob(card, jobId);
+  }
+
+  function restoreIsoJobsFromActivity() {
+    api('/api/activity').then(function (data) {
+      renderActivity(data || { installs: [], isos: [], activeCount: 0 });
+      (data.isos || []).forEach(function (item) {
+        if (!item.key || !item.jobId) { return; }
+        var active = item.state === 'running' || item.state === 'queued' || item.alive;
+        if (!active) { return; }
+        if (isoJobs[item.key] && isoJobs[item.key].jobId === item.jobId) { return; }
+        attachIsoJobToCard(item.key, item.jobId, {
+          message: item.message || 'Downloading…',
+          percent: item.percent
+        });
+      });
+    }).catch(function () { /* best-effort */ });
   }
 
   function refreshIsoArchOptions(card) {
@@ -587,7 +617,13 @@
         btn.disabled = false;
         return;
       }
-      setIsoStatus(card, 'Downloading to ' + (data.destDir || '') + '…');
+      if (data.reattached) {
+        setIsoStatus(card, 'Reconnected to download already in progress…');
+      } else {
+        setIsoStatus(card, 'Downloading to ' + (data.destDir || '') + '…');
+      }
+      if (isoJobs[key] && isoJobs[key].timer) { clearTimeout(isoJobs[key].timer); }
+      isoJobs[key] = { jobId: data.jobId, timer: null };
       pollIsoJob(card, data.jobId);
       loadActivity();
     }).catch(function (error) {
@@ -1006,6 +1042,12 @@
         activeCategory = 'os';
         renderCategories();
         renderApps();
+        var key = null;
+        // Prefer matching card from activity payload via data attributes on button
+        var isoKey = item.getAttribute('data-key');
+        if (isoKey) {
+          attachIsoJobToCard(isoKey, jobId, { message: 'Reconnected…' });
+        }
         var group = document.getElementById('group-os');
         if (group) { group.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
       }

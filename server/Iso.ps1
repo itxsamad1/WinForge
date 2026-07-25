@@ -131,12 +131,106 @@ function Test-SafeIsoDestDir {
     return $true
 }
 
+function Test-IsoProcessAlive {
+    param($PidValue)
+    if ($null -eq $PidValue) { return $false }
+    try {
+        $proc = Get-Process -Id ([int]$PidValue) -ErrorAction Stop
+        return ($null -ne $proc -and -not $proc.HasExited)
+    } catch {
+        return $false
+    }
+}
+
+function Find-ActiveIsoJob {
+    <#
+        Returns an in-flight ISO job for the same OS key / file so a page reload
+        or second click reattaches instead of starting a conflicting download.
+    #>
+    param(
+        [Parameter(Mandatory = $true)] [hashtable]$Context,
+        [Parameter(Mandatory = $true)] [string]$Key,
+        [string]$File,
+        [string]$DestDir
+    )
+
+    $jobsRoot = Join-Path $Context.StateDir 'iso-jobs'
+    if (-not (Test-Path -LiteralPath $jobsRoot)) { return $null }
+
+    $dirs = Get-ChildItem -LiteralPath $jobsRoot -Directory -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending
+    foreach ($dir in $dirs) {
+        if ($dir.Name -notmatch '^[a-f0-9]{12}$') { continue }
+        $plan = Read-JsonFile -Path (Join-Path $dir.FullName 'plan.json')
+        $status = Read-JsonFile -Path (Join-Path $dir.FullName 'status.json')
+        if ($null -eq $plan) { continue }
+
+        $planKey = Get-Prop $plan 'key'
+        $planFile = Get-Prop $plan 'file'
+        if ($planKey -ne $Key) { continue }
+        if (-not [string]::IsNullOrWhiteSpace($File) -and $planFile -ne $File) { continue }
+        if (-not [string]::IsNullOrWhiteSpace($DestDir)) {
+            $planDest = Get-Prop $plan 'destDir'
+            if (-not [string]::IsNullOrWhiteSpace($planDest) -and
+                ([IO.Path]::GetFullPath($planDest) -ne [IO.Path]::GetFullPath($DestDir))) {
+                continue
+            }
+        }
+
+        $state = if ($null -ne $status) { Get-Prop $status 'state' } else { 'unknown' }
+        $pidValue = if ($null -ne $status) { Get-Prop $status 'pid' } else { $null }
+        $alive = Test-IsoProcessAlive -PidValue $pidValue
+        $partialPath = $null
+        if (-not [string]::IsNullOrWhiteSpace($DestDir) -and -not [string]::IsNullOrWhiteSpace($planFile)) {
+            $partialPath = Join-Path $DestDir ($planFile + '.partial')
+        } elseif ($null -ne $status) {
+            $destPath = Get-Prop $status 'destPath'
+            if (-not [string]::IsNullOrWhiteSpace($destPath)) { $partialPath = "$destPath.partial" }
+        }
+        $partialBusy = $false
+        if (-not [string]::IsNullOrWhiteSpace($partialPath) -and (Test-Path -LiteralPath $partialPath)) {
+            try {
+                $fs = [System.IO.File]::Open($partialPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+                $fs.Dispose()
+            } catch {
+                $partialBusy = $true
+            }
+        }
+
+        if (-not $alive -and -not $partialBusy) { continue }
+
+        # Heal a failed/stale status while the downloader is still alive.
+        if ($null -ne $status -and $alive -and $state -ne 'running') {
+            $status.state = 'running'
+            if ([string]::IsNullOrWhiteSpace((Get-Prop $status 'message'))) {
+                $status.message = 'Downloading'
+            }
+            try { Write-JsonFile -Path (Join-Path $dir.FullName 'status.json') -Value $status } catch { }
+        }
+
+        return [pscustomobject]@{
+            jobId   = $dir.Name
+            destDir = Get-Prop $plan 'destDir'
+            name    = Get-Prop $plan 'name' (Get-Prop $status 'name' 'ISO')
+            file    = $planFile
+            key     = $planKey
+            reattached = $true
+        }
+    }
+    return $null
+}
+
 function Start-IsoDownloadJob {
     param(
         [Parameter(Mandatory = $true)] [hashtable]$Context,
         [Parameter(Mandatory = $true)] $Variant,
         [Parameter(Mandatory = $true)] [string]$DestDir
     )
+
+    $existing = Find-ActiveIsoJob -Context $Context -Key $Variant.key -File $Variant.file -DestDir $DestDir
+    if ($null -ne $existing) {
+        return $existing
+    }
 
     $jobsRoot = Join-Path $Context.StateDir 'iso-jobs'
     if (-not (Test-Path -LiteralPath $jobsRoot)) {
@@ -147,6 +241,7 @@ function Start-IsoDownloadJob {
     $jobDir = Join-Path $jobsRoot $jobId
     New-Item -ItemType Directory -Path $jobDir -Force | Out-Null
 
+    $startedAt = (Get-Date).ToString('o')
     $plan = [pscustomobject]@{
         jobId   = $jobId
         key     = $Variant.key
@@ -160,37 +255,40 @@ function Start-IsoDownloadJob {
     }
     Write-JsonFile -Path (Join-Path $jobDir 'plan.json') -Value $plan
 
-    $status = [pscustomobject]@{
+    Write-JsonFile -Path (Join-Path $jobDir 'status.json') -Value ([pscustomobject]@{
         jobId      = $jobId
+        key        = $Variant.key
         state      = 'queued'
         name       = $Variant.name
         percent    = 0
         message    = 'Starting'
+        speed      = $null
         destPath   = $null
         error      = $null
-        startedAt  = (Get-Date).ToString('o')
+        startedAt  = $startedAt
         finishedAt = $null
-    }
-    Write-JsonFile -Path (Join-Path $jobDir 'status.json') -Value $status
+    })
 
     $runner = Join-Path $Context.Root 'server\Download-Iso.ps1'
-    $args = @(
+    $argList = @(
         '-NoProfile', '-ExecutionPolicy', 'Bypass',
         '-WindowStyle', 'Hidden',
         '-File', "`"$runner`"",
         '-JobDir', "`"$jobDir`""
     )
-    $proc = Start-Process -FilePath 'powershell.exe' -ArgumentList $args -PassThru -WindowStyle Hidden
+    $proc = Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -PassThru -WindowStyle Hidden
     Write-JsonFile -Path (Join-Path $jobDir 'status.json') -Value ([pscustomobject]@{
         jobId      = $jobId
+        key        = $Variant.key
         state      = 'running'
         name       = $Variant.name
         percent    = 0
         message    = 'Downloading'
-        destPath   = $null
+        speed      = $null
+        destPath   = (Join-Path $DestDir $Variant.file)
         error      = $null
         pid        = $proc.Id
-        startedAt  = $status.startedAt
+        startedAt  = $startedAt
         finishedAt = $null
     })
 
@@ -199,6 +297,8 @@ function Start-IsoDownloadJob {
         destDir = $DestDir
         name    = $Variant.name
         file    = $Variant.file
+        key     = $Variant.key
+        reattached = $false
     }
 }
 
@@ -208,7 +308,21 @@ function Get-IsoJobState {
         [Parameter(Mandatory = $true)] [string]$JobId
     )
     if ($JobId -notmatch '^[a-f0-9]{12}$') { return $null }
-    $path = Join-Path $Context.StateDir "iso-jobs\$JobId\status.json"
+    $jobDir = Join-Path $Context.StateDir "iso-jobs\$JobId"
+    $path = Join-Path $jobDir 'status.json'
     if (-not (Test-Path -LiteralPath $path)) { return $null }
-    return Read-JsonFile -Path $path
+    $status = Read-JsonFile -Path $path
+    if ($null -eq $status) { return $null }
+
+    $pidValue = Get-Prop $status 'pid'
+    if ($null -ne $pidValue -and (Test-IsoProcessAlive -PidValue $pidValue)) {
+        $state = Get-Prop $status 'state'
+        if ($state -notin @('running', 'queued', 'finished')) {
+            $status.state = 'running'
+            if ([string]::IsNullOrWhiteSpace((Get-Prop $status 'message'))) {
+                $status.message = 'Downloading'
+            }
+        }
+    }
+    return $status
 }

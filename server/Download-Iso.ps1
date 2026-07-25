@@ -31,6 +31,7 @@ function Save-IsoStatus {
 }
 
 $name = Get-Prop $plan 'name' 'ISO'
+$key = Get-Prop $plan 'key'
 $url = Get-Prop $plan 'url'
 $file = Get-Prop $plan 'file'
 $destDir = Get-Prop $plan 'destDir'
@@ -41,6 +42,7 @@ $partial = $null
 
 $status = [pscustomobject]@{
     jobId      = $jobId
+    key        = $key
     state      = 'running'
     name       = $name
     percent    = 0
@@ -48,6 +50,7 @@ $status = [pscustomobject]@{
     speed      = $null
     destPath   = $null
     error      = $null
+    pid        = $PID
     startedAt  = $startedAt
     finishedAt = $null
 }
@@ -78,13 +81,18 @@ try {
         $status.state = 'finished'
         $status.percent = 100
         $status.message = 'Already downloaded'
+        $status.speed = $null
         $status.finishedAt = (Get-Date).ToString('o')
         Save-IsoStatus $status
         return
     }
 
     if (Test-Path -LiteralPath $partial) {
-        Remove-Item -LiteralPath $partial -Force -ErrorAction SilentlyContinue
+        try {
+            Remove-Item -LiteralPath $partial -Force -ErrorAction Stop
+        } catch {
+            throw 'This ISO is already downloading in another WinForge job. Open Activity to watch it, or wait until it finishes.'
+        }
     }
 
     $request = [System.Net.HttpWebRequest]::Create($url)

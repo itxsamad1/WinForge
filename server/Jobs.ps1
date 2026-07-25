@@ -220,22 +220,39 @@ function Get-ActivitySnapshot {
         foreach ($dir in $isoDirs) {
             if ($dir.Name -notmatch '^[a-f0-9]{12}$') { continue }
             $status = Read-JsonFile -Path (Join-Path $dir.FullName 'status.json')
-            if ($null -eq $status) { continue }
+            $plan = Read-JsonFile -Path (Join-Path $dir.FullName 'plan.json')
+            if ($null -eq $status -and $null -eq $plan) { continue }
+
+            $state = if ($null -ne $status) { Get-Prop $status 'state' 'unknown' } else { 'unknown' }
+            $pidValue = if ($null -ne $status) { Get-Prop $status 'pid' } else { $null }
+            $alive = $false
+            if ($null -ne $pidValue) {
+                try {
+                    $proc = Get-Process -Id ([int]$pidValue) -ErrorAction Stop
+                    $alive = ($null -ne $proc -and -not $proc.HasExited)
+                } catch { $alive = $false }
+            }
+            if ($alive -and $state -notin @('running', 'queued')) {
+                $state = 'running'
+            }
+
             $isos += [pscustomobject]@{
-                kind    = 'iso'
-                jobId   = Get-Prop $status 'jobId' $dir.Name
-                state   = Get-Prop $status 'state' 'unknown'
-                name    = Get-Prop $status 'name' 'ISO download'
-                detail  = Get-Prop $status 'speed'
-                percent = Get-Prop $status 'percent'
-                message = Get-Prop $status 'message'
-                destPath = Get-Prop $status 'destPath'
+                kind     = 'iso'
+                jobId    = if ($null -ne $status) { Get-Prop $status 'jobId' $dir.Name } else { $dir.Name }
+                key      = if ($null -ne $status -and (Get-Prop $status 'key')) { Get-Prop $status 'key' } else { Get-Prop $plan 'key' }
+                state    = $state
+                name     = if ($null -ne $status) { Get-Prop $status 'name' 'ISO download' } else { Get-Prop $plan 'name' 'ISO download' }
+                detail   = if ($null -ne $status) { Get-Prop $status 'speed' } else { $null }
+                percent  = if ($null -ne $status) { Get-Prop $status 'percent' } else { $null }
+                message  = if ($null -ne $status) { Get-Prop $status 'message' } else { 'Downloading' }
+                destPath = if ($null -ne $status) { Get-Prop $status 'destPath' } else { $null }
+                alive    = $alive
             }
         }
     }
 
     $activeCount = @($installs | Where-Object { $_.state -notin @('finished', 'failed') }).Count +
-        @($isos | Where-Object { $_.state -in @('queued', 'running') }).Count
+        @($isos | Where-Object { $_.state -in @('queued', 'running') -or $_.alive }).Count
 
     return [pscustomobject]@{
         activeCount = $activeCount

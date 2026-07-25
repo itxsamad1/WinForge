@@ -13,12 +13,14 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-35C37D?style=flat-square" alt="MIT License"></a>
   <a href="catalog/apps.json"><img src="https://img.shields.io/badge/catalog-112%20apps-4F8CFF?style=flat-square" alt="112 apps"></a>
   <img src="https://img.shields.io/badge/dependencies-none-555555?style=flat-square" alt="zero dependencies">
-  <img src="https://img.shields.io/badge/PowerShell-5.1%2B-5391FE?style=flat-square&logo=powershell&logoColor=white" alt="PowerShell 5.1+">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Windows-supported-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows supported">
-  <img src="https://img.shields.io/badge/winget-supported-00A4EF?style=for-the-badge" alt="winget supported"
+  <img src="https://img.shields.io/badge/-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/-winget-00A4EF?style=for-the-badge&logo=windowsterminal&logoColor=white" alt="winget">
+  <img src="https://img.shields.io/badge/-Claude%20Code-D97757?style=for-the-badge" alt="Claude Code">
+  <img src="https://img.shields.io/badge/-Codex-10A37F?style=for-the-badge&logo=openai&logoColor=white" alt="Codex">
+  <img src="https://img.shields.io/badge/-Cursor-1A1A1A?style=for-the-badge" alt="Cursor">
 </p>
 
 ---

@@ -42,9 +42,22 @@
     progressTitle: document.getElementById('progress-title'),
     progressSub: document.getElementById('progress-sub'),
     progressFill: document.getElementById('progress-fill'),
+    progressPercent: document.getElementById('progress-percent'),
+    progressPhase: document.getElementById('progress-phase'),
+    progressElapsed: document.getElementById('progress-elapsed'),
+    progressEta: document.getElementById('progress-eta'),
     progressSteps: document.getElementById('progress-steps'),
     progressSummary: document.getElementById('progress-summary'),
     progressClose: document.getElementById('progress-close')
+  };
+
+  var PHASE_LABELS = {
+    starting: 'Starting',
+    resolving: 'Finding package',
+    downloading: 'Downloading',
+    verifying: 'Verifying',
+    installing: 'Installing',
+    done: 'Done'
   };
 
   // ---------------------------------------------------------------- helpers
@@ -79,6 +92,69 @@
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function formatDuration(ms) {
+    var total = Math.max(0, Math.round(ms / 1000));
+    if (total < 60) { return total + 's'; }
+    var minutes = Math.floor(total / 60);
+    var seconds = total % 60;
+    if (minutes < 60) { return minutes + 'm ' + seconds + 's'; }
+    var hours = Math.floor(minutes / 60);
+    minutes = minutes % 60;
+    return hours + 'h ' + minutes + 'm';
+  }
+
+  function stepProgressValue(step) {
+    if (step.state === 'done' || step.state === 'manual') { return 100; }
+    if (step.state === 'failed') { return 100; }
+    if (step.state === 'running') {
+      var percent = typeof step.percent === 'number' ? step.percent : parseInt(step.percent, 10);
+      return isNaN(percent) ? 8 : Math.max(0, Math.min(99, percent));
+    }
+    return 0;
+  }
+
+  function overallProgress(steps) {
+    if (!steps || !steps.length) { return 0; }
+    var sum = 0;
+    steps.forEach(function (step) { sum += stepProgressValue(step); });
+    return Math.round(sum / steps.length);
+  }
+
+  function updateProgressMeta(status) {
+    var steps = status.steps || [];
+    var overall = overallProgress(steps);
+    var running = steps.filter(function (step) { return step.state === 'running'; })[0];
+    var elapsedMs = job && job.startedAt ? (Date.now() - job.startedAt) : 0;
+
+    if (el.progressPercent) { el.progressPercent.textContent = overall + '%'; }
+    if (el.progressFill) { el.progressFill.style.width = overall + '%'; }
+    if (el.progressElapsed) { el.progressElapsed.textContent = formatDuration(elapsedMs); }
+
+    if (el.progressPhase) {
+      if (running) {
+        var phase = PHASE_LABELS[running.phase] || 'Working';
+        var detail = running.progressDetail ? ' · ' + running.progressDetail : '';
+        var stepPct = stepProgressValue(running);
+        el.progressPhase.textContent = phase + ' · ' + running.name + ' · ' + stepPct + '%' + detail;
+      } else if (status.state === 'finished' || status.state === 'failed') {
+        el.progressPhase.textContent = status.state === 'failed' ? 'Finished with errors' : 'Complete';
+      } else {
+        el.progressPhase.textContent = 'Preparing';
+      }
+    }
+
+    if (el.progressEta) {
+      if (overall >= 5 && overall < 100 && elapsedMs > 2000) {
+        var remaining = elapsedMs * (100 - overall) / overall;
+        el.progressEta.textContent = '~' + formatDuration(remaining);
+      } else if (overall >= 100) {
+        el.progressEta.textContent = 'done';
+      } else {
+        el.progressEta.textContent = '—';
+      }
+    }
   }
 
   function showBanner(message, tone) {
@@ -245,6 +321,10 @@
     el.progressFill.style.width = '0%';
     el.progressSteps.innerHTML = '';
     el.progressPanel.hidden = false;
+    if (el.progressPercent) { el.progressPercent.textContent = '0%'; }
+    if (el.progressPhase) { el.progressPhase.textContent = 'Starting'; }
+    if (el.progressElapsed) { el.progressElapsed.textContent = '0s'; }
+    if (el.progressEta) { el.progressEta.textContent = '—'; }
 
     api('/api/install', {
       method: 'POST',
@@ -288,7 +368,7 @@
       renderJob(data);
       var finished = data.status.state === 'finished' || data.status.state === 'failed';
       if (!finished) {
-        job.timer = setTimeout(pollJob, 750);
+        job.timer = setTimeout(pollJob, 500);
       } else if (data.status.launchError) {
         // Already surfaced by renderJob; just unlock the UI.
         el.progressClose.hidden = false;
@@ -322,13 +402,16 @@
     var doneCount = steps.filter(function (step) {
       return step.state === 'done' || step.state === 'failed' || step.state === 'manual';
     }).length;
-    el.progressFill.style.width = (steps.length ? (doneCount / steps.length) * 100 : 0) + '%';
+
+    updateProgressMeta(status);
 
     var running = steps.filter(function (step) { return step.state === 'running'; })[0];
     job.activeIndex = running ? running.index : null;
 
     if (running) {
-      el.progressSub.textContent = 'Installing ' + running.name + ' (' + (doneCount + 1) + ' of ' + steps.length + ')';
+      var stepPct = stepProgressValue(running);
+      var phase = PHASE_LABELS[running.phase] || 'Installing';
+      el.progressSub.textContent = phase + ' ' + running.name + ' — ' + stepPct + '% (' + (doneCount + 1) + ' of ' + steps.length + ')';
       // Follow the active step automatically so the user always sees live output.
       job.expanded.add(running.index);
     }
@@ -354,6 +437,9 @@
 
   function renderStep(step) {
     var existing = document.getElementById('step-' + step.index);
+    var pct = stepProgressValue(step);
+    var phase = PHASE_LABELS[step.phase] || '';
+    var detail = step.progressDetail || '';
 
     if (!existing) {
       var li = document.createElement('li');
@@ -363,7 +449,14 @@
       li.innerHTML =
         '<div class="step-head" data-index="' + step.index + '">' +
         '<span class="step-icon"></span>' +
+        '<div class="step-main">' +
+        '<div class="step-title-row">' +
         '<span class="step-name">' + escapeHtml(step.name) + '</span>' +
+        '<span class="step-pct" id="pct-' + step.index + '"></span>' +
+        '</div>' +
+        '<div class="step-track"><div class="step-track-fill" id="fill-' + step.index + '"></div></div>' +
+        '<div class="step-phase" id="phase-' + step.index + '"></div>' +
+        '</div>' +
         '<span class="step-msg" id="msg-' + step.index + '"></span>' +
         '</div>' +
         '<pre class="step-log" id="log-' + step.index + '" hidden></pre>';
@@ -374,6 +467,27 @@
     existing.setAttribute('data-state', step.state);
     var message = document.getElementById('msg-' + step.index);
     if (message) { message.textContent = step.message || ''; }
+
+    var pctEl = document.getElementById('pct-' + step.index);
+    if (pctEl) {
+      if (step.state === 'pending') { pctEl.textContent = ''; }
+      else if (step.state === 'done') { pctEl.textContent = '100%'; }
+      else if (step.state === 'failed') { pctEl.textContent = 'failed'; }
+      else if (step.state === 'manual') { pctEl.textContent = 'manual'; }
+      else { pctEl.textContent = pct + '%'; }
+    }
+
+    var fill = document.getElementById('fill-' + step.index);
+    if (fill) { fill.style.width = pct + '%'; }
+
+    var phaseEl = document.getElementById('phase-' + step.index);
+    if (phaseEl) {
+      if (step.state === 'running') {
+        phaseEl.textContent = (phase || 'Working') + (detail ? ' · ' + detail : '');
+      } else {
+        phaseEl.textContent = '';
+      }
+    }
 
     var log = document.getElementById('log-' + step.index);
     if (log) { log.hidden = !job.expanded.has(step.index); }
@@ -386,6 +500,9 @@
     var done = steps.filter(function (step) { return step.state === 'done'; });
 
     el.progressFill.style.width = '100%';
+    if (el.progressPercent) { el.progressPercent.textContent = '100%'; }
+    if (el.progressEta) { el.progressEta.textContent = 'done'; }
+    updateProgressMeta(status);
     el.progressTitle.textContent = failed.length ? 'Finished with problems' : 'All done';
     el.progressSub.textContent = done.length + ' of ' + steps.length + ' installed successfully.';
     el.progressClose.hidden = false;

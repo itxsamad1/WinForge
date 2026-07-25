@@ -41,6 +41,12 @@
       "name": "Design & Media",
       "description": "Editing, capture and encoding tools.",
       "apps": ["creative-cloud", "figma", "obs-studio", "bandicam", "davinci-resolve", "ffmpeg", "handbrake", "vlc", "sharex"]
+    },
+    {
+      "key": "vms",
+      "name": "VMs & Labs",
+      "description": "Desktop hypervisors and reproducible VM tooling.",
+      "apps": ["virtualbox", "vagrant", "qemu", "multipass", "windows-terminal"]
     }
   ]
 }

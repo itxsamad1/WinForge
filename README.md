@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-35C37D?style=flat-square" alt="MIT License"></a>
-  <a href="catalog/apps.json"><img src="https://img.shields.io/badge/catalog-112%20apps-4F8CFF?style=flat-square" alt="112 apps"></a>
+  <a href="catalog/apps.json"><img src="https://img.shields.io/badge/catalog-118%20apps-4F8CFF?style=flat-square" alt="118 apps"></a>
   <img src="https://img.shields.io/badge/dependencies-none-555555?style=flat-square" alt="zero dependencies">
 </p>
 

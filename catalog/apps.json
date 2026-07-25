@@ -9,6 +9,7 @@
     { "id": "databases", "name": "Databases",             "icon": "database" },
     { "id": "api",       "name": "API & Networking",      "icon": "plug" },
     { "id": "ai",        "name": "AI & Local Models",     "icon": "spark" },
+    { "id": "cli",       "name": "AI CLIs & Agents",      "icon": "bot" },
     { "id": "design",    "name": "Design & Media",        "icon": "palette" },
     { "id": "browsers",  "name": "Browsers",              "icon": "globe" },
     { "id": "utilities", "name": "Utilities",             "icon": "tools" },
@@ -460,12 +461,21 @@
 
     {
       "key": "postgresql",
-      "name": "PostgreSQL 17",
-      "id": "PostgreSQL.PostgreSQL.17",
+      "name": "PostgreSQL 18",
+      "id": "PostgreSQL.PostgreSQL.18",
       "category": "databases",
-      "description": "Relational database server plus tools.",
-      "notes": "PostgreSQL 16's EnterpriseDB download often returns HTTP 403 via winget, so this catalog ships 17 instead.",
-      "detect": { "cmd": "psql", "registry": "^PostgreSQL 17" }
+      "description": "Relational database server (latest major).",
+      "notes": "Does not include pgAdmin — pick the separate pgAdmin card if you want the GUI.",
+      "detect": { "cmd": "psql", "registry": "^PostgreSQL 18" }
+    },
+    {
+      "key": "pgadmin",
+      "name": "pgAdmin 4",
+      "id": "PostgreSQL.pgAdmin",
+      "category": "databases",
+      "description": "Official GUI for PostgreSQL, like Compass is for MongoDB.",
+      "after": ["postgresql"],
+      "detect": { "registry": "^pgAdmin 4" }
     },
     {
       "key": "mysql",
@@ -582,6 +592,14 @@
       "description": "Classic SSH and serial terminal client.",
       "detect": { "cmd": "putty", "registry": "^PuTTY" }
     },
+    {
+      "key": "hoppscotch",
+      "name": "Hoppscotch",
+      "id": "hoppscotch.Hoppscotch",
+      "category": "api",
+      "description": "Open-source API client, a lightweight Postman alternative.",
+      "detect": { "registry": "^Hoppscotch" }
+    },
 
     {
       "key": "ollama",
@@ -589,6 +607,7 @@
       "id": "Ollama.Ollama",
       "category": "ai",
       "description": "Run large language models locally from the terminal.",
+      "popular": true,
       "detect": { "cmd": "ollama", "registry": "^Ollama" }
     },
     {
@@ -597,7 +616,25 @@
       "id": "ElementLabs.LMStudio",
       "category": "ai",
       "description": "Desktop app for downloading and chatting with local models.",
+      "popular": true,
       "detect": { "registry": "^LM Studio" }
+    },
+    {
+      "key": "comfyui",
+      "name": "ComfyUI Desktop",
+      "id": "Comfy.ComfyUI-Desktop",
+      "category": "ai",
+      "description": "Node-based UI for Stable Diffusion and local image models.",
+      "detect": { "registry": "^ComfyUI" }
+    },
+    {
+      "key": "cuda",
+      "name": "NVIDIA CUDA Toolkit",
+      "id": "Nvidia.CUDA",
+      "category": "ai",
+      "description": "GPU toolkit needed by many local AI and ML workloads.",
+      "notes": "Large download. Only useful if you have an NVIDIA GPU.",
+      "detect": { "registry": "^CUDA" }
     },
     {
       "key": "claude-desktop",
@@ -606,6 +643,80 @@
       "category": "ai",
       "description": "Official Claude desktop app.",
       "detect": { "registry": "^Claude" }
+    },
+    {
+      "key": "chatgpt-desktop",
+      "name": "ChatGPT",
+      "kind": "manual",
+      "category": "ai",
+      "url": "https://chatgpt.com/desktop",
+      "description": "Official ChatGPT desktop app.",
+      "instructions": "OpenAI does not publish the ChatGPT desktop app to winget. The button below opens the official download page.",
+      "detect": { "registry": "^ChatGPT" }
+    },
+
+    {
+      "key": "antigravity",
+      "name": "Antigravity",
+      "id": "Google.Antigravity",
+      "category": "cli",
+      "description": "Google's AI coding agent IDE.",
+      "popular": true,
+      "detect": { "registry": "^Antigravity" }
+    },
+    {
+      "key": "claude-code",
+      "name": "Claude Code",
+      "id": "Anthropic.ClaudeCode",
+      "category": "cli",
+      "description": "Anthropic's agentic coding CLI.",
+      "popular": true,
+      "detect": { "cmd": "claude", "registry": "^Claude Code" }
+    },
+    {
+      "key": "codex-cli",
+      "name": "OpenAI Codex CLI",
+      "id": "OpenAI.Codex",
+      "category": "cli",
+      "description": "OpenAI's coding agent in the terminal.",
+      "detect": { "cmd": "codex" }
+    },
+    {
+      "key": "github-copilot-cli",
+      "name": "GitHub Copilot CLI",
+      "id": "GitHub.Copilot",
+      "category": "cli",
+      "description": "Copilot in the terminal for GitHub workflows.",
+      "detect": { "cmd": "copilot" }
+    },
+    {
+      "key": "gemini-cli",
+      "name": "Gemini CLI",
+      "kind": "script",
+      "command": "gemini-cli",
+      "category": "cli",
+      "description": "Google Gemini command line agent.",
+      "after": ["node-lts", "nvm-windows"],
+      "notes": "Not on winget. Installs via npm once Node is available.",
+      "detect": { "cmd": "gemini" }
+    },
+    {
+      "key": "pnpm",
+      "name": "pnpm",
+      "id": "pnpm.pnpm",
+      "category": "cli",
+      "description": "Fast, disk-efficient Node package manager.",
+      "after": ["node-lts"],
+      "detect": { "cmd": "pnpm" }
+    },
+    {
+      "key": "yarn",
+      "name": "Yarn",
+      "id": "Yarn.Yarn",
+      "category": "cli",
+      "description": "Classic Node package manager.",
+      "after": ["node-lts"],
+      "detect": { "cmd": "yarn" }
     },
 
     {
@@ -659,14 +770,6 @@
       "category": "design",
       "description": "Vector graphics editor.",
       "detect": { "registry": "^Inkscape" }
-    },
-    {
-      "key": "obs-studio",
-      "name": "OBS Studio",
-      "id": "OBSProject.OBSStudio",
-      "category": "design",
-      "description": "Screen recording and live streaming.",
-      "detect": { "registry": "^OBS Studio" }
     },
     {
       "key": "davinci-resolve",
@@ -762,6 +865,31 @@
       "description": "Archive tool that opens everything.",
       "popular": true,
       "detect": { "registry": "^7-Zip" }
+    },
+    {
+      "key": "fdm",
+      "name": "Free Download Manager",
+      "id": "SoftDeluxe.FreeDownloadManager",
+      "category": "utilities",
+      "description": "Download manager with scheduling and torrent support.",
+      "detect": { "registry": "^Free Download Manager" }
+    },
+    {
+      "key": "obs-studio",
+      "name": "OBS Studio",
+      "id": "OBSProject.OBSStudio",
+      "category": "utilities",
+      "description": "Screen recording and live streaming.",
+      "popular": true,
+      "detect": { "registry": "^OBS Studio" }
+    },
+    {
+      "key": "bandicam",
+      "name": "Bandicam",
+      "id": "BandicamCompany.Bandicam",
+      "category": "utilities",
+      "description": "Lightweight game and desktop recorder.",
+      "detect": { "registry": "^Bandicam" }
     },
     {
       "key": "everything",

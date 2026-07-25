@@ -106,7 +106,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\Smoke-Test.ps1
 **Full run in a disposable VM:**
 
 ```text
-Test-In-Sandbox.cmd
+tools\sandbox\Test-In-Sandbox.cmd
 ```
 
 Needs Windows Sandbox (Pro/Enterprise). Closing the sandbox window destroys everything it did.
@@ -123,6 +123,7 @@ Needs Windows Sandbox (Pro/Enterprise). Closing the sandbox window destroys ever
 ```text
 WinForge.cmd                double-click entry
 start.ps1                   port, token, browser
+LICENSE / README / .gitignore
 server/                     HTTP API + elevated runner
 catalog/                    apps, presets, postinstall, scripts
 web/                        UI (no build step)

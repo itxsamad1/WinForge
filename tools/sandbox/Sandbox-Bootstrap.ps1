@@ -40,7 +40,7 @@ Write-Step 'Copying the project to a writable location'
 # ---------------------------------------------------------------------------
 
 if (-not (Test-Path $Source)) {
-    Write-Host "  Mapped folder $Source not found. Was the sandbox started from Test-In-Sandbox.cmd?" -ForegroundColor Red
+    Write-Host "  Mapped folder $Source not found. Was the sandbox started from tools\sandbox\Test-In-Sandbox.cmd?" -ForegroundColor Red
     Read-Host '  Press Enter to close'
     exit 1
 }

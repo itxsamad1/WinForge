@@ -475,9 +475,10 @@
       "name": "VMware Workstation Pro",
       "kind": "manual",
       "category": "vms",
-      "url": "https://www.vmware.com/products/desktop-hypervisor/workstation-and-fusion.html",
-      "description": "Broadcom/VMware desktop hypervisor (Pro).",
-      "instructions": "VMware Workstation is not on winget (Broadcom login / license gate). The button opens the official download page — sign in, download the Windows installer, then run it.",
+      "url": "https://support.broadcom.com/group/ecx/productdownloads?subfamily=VMware%20Workstation%20Pro&freeDownloads=true",
+      "description": "Free desktop hypervisor (personal, education, and commercial — no license key).",
+      "instructions": "Broadcom made Workstation Pro free for everyone; Player is no longer the free tier. It is not on winget. Sign in to the Broadcom Support Portal (free account), download Workstation Pro for Windows, install, and skip any license key — choose the free / personal-use finish option if asked.",
+      "notes": "Free as of Broadcom's desktop hypervisor change. Download needs a Broadcom account.",
       "detect": { "cmd": "vmrun", "registry": "^VMware Workstation" }
     },
     {

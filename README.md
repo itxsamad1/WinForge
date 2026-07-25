@@ -29,7 +29,7 @@ Think **Ninite**, but for a developer machine, with the PATH work done for you.
 
 ## Quick start
 
-1. Clone this repo (or copy the folder onto a USB stick).
+1. Clone this repo (or copy the folder onto a USB stick or download the zip and unzip it).
 2. Double-click **`WinForge.cmd`**.
 3. A browser opens at `http://localhost:47113`.
 4. Pick apps or a preset, press **Install**, accept the one UAC prompt.

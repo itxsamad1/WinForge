@@ -1,5 +1,13 @@
 # WinForge
 
+<p align="center">
+  <img src="docs/images/logo-full.png" alt="WinForge — Forge your perfect Windows experience" width="420">
+</p>
+
+<p align="center">
+  <img src="docs/images/logo-mark.png" alt="WinForge mark" width="72">
+</p>
+
 A local web app that sets up a fresh Windows machine in one pass. Tick the tools
 you want, press Install, and a PowerShell backend drives `winget` silently and
 wires up the environment variables that normally cost you an afternoon:

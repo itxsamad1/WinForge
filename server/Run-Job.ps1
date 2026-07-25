@@ -197,7 +197,16 @@ function Invoke-WingetInstall {
 
     # Capture stdout and stderr together and stream each line into the log so
     # the UI shows download progress rather than a frozen spinner.
-    & winget @arguments 2>&1 | ForEach-Object { Write-StepLog ([string]$_) }
+    # Native tools (winget, git, …) write progress to stderr. With
+    # $ErrorActionPreference Stop, 2>&1 turns those lines into terminating
+    # ErrorRecords — so briefly allow Continue while streaming the log.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & winget @arguments 2>&1 | ForEach-Object { Write-StepLog ([string]$_) }
+    } finally {
+        $ErrorActionPreference = $previous
+    }
 
     return $LASTEXITCODE
 }
@@ -214,7 +223,13 @@ function Invoke-CatalogScript {
     if (-not (Test-Path -LiteralPath $ScriptPath)) {
         throw "Script not found: $ScriptPath"
     }
-    & $ScriptPath -Context $context -Options $Options 2>&1 | ForEach-Object { Write-StepLog ([string]$_) }
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $ScriptPath -Context $context -Options $Options 2>&1 | ForEach-Object { Write-StepLog ([string]$_) }
+    } finally {
+        $ErrorActionPreference = $previous
+    }
 }
 
 # ---------------------------------------------------------------------------

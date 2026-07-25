@@ -18,9 +18,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white" alt="Windows">
   <img src="https://img.shields.io/badge/-winget-00A4EF?style=for-the-badge&logo=windowsterminal&logoColor=white" alt="winget">
-  <img src="https://img.shields.io/badge/-Claude%20Code-D97757?style=for-the-badge" alt="Claude Code">
-  <img src="https://img.shields.io/badge/-Codex-10A37F?style=for-the-badge&logo=openai&logoColor=white" alt="Codex">
-  <img src="https://img.shields.io/badge/-Cursor-1A1A1A?style=for-the-badge" alt="Cursor">
 </p>
 
 ---

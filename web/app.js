@@ -27,6 +27,7 @@
     presetList: document.getElementById('preset-list'),
     appGroups: document.getElementById('app-groups'),
     clearSelection: document.getElementById('clear-selection'),
+    deselectAll: document.getElementById('deselect-all'),
     selectionBar: document.getElementById('selection-bar'),
     selectionCount: document.getElementById('selection-count'),
     selectionLabel: document.getElementById('selection-label'),
@@ -628,11 +629,16 @@
     }
   });
 
-  el.clearSelection.addEventListener('click', function () {
+  function clearAllSelection() {
     selected.clear();
     renderApps();
     renderSelection();
-  });
+  }
+
+  el.clearSelection.addEventListener('click', clearAllSelection);
+  if (el.deselectAll) {
+    el.deselectAll.addEventListener('click', clearAllSelection);
+  }
 
   el.refresh.addEventListener('click', function () {
     el.refresh.textContent = 'Scanning...';

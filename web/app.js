@@ -314,7 +314,7 @@
       '<label class="iso-field">CPU / arch<select class="iso-arch">' + archOpts + '</select></label>' +
       destBlock +
       '<button type="button" class="primary-btn iso-download">' + actionLabel + '</button>' +
-      '<div class="iso-status" hidden></div>' +
+      '<div class="iso-status" hidden><span class="iso-status-msg"></span><span class="iso-status-speed"></span></div>' +
       '<div class="iso-progress" hidden><div class="iso-progress-fill"></div></div>' +
       '</div></div>';
   }
@@ -385,11 +385,18 @@
     }
   }
 
-  function setIsoStatus(card, text, tone) {
+  function setIsoStatus(card, text, tone, speed) {
     var status = card.querySelector('.iso-status');
     if (!status) { return; }
+    var msg = status.querySelector('.iso-status-msg');
+    var spd = status.querySelector('.iso-status-speed');
     status.hidden = !text;
-    status.textContent = text || '';
+    if (msg) { msg.textContent = text || ''; }
+    else { status.textContent = text || ''; }
+    if (spd) {
+      spd.textContent = speed || '';
+      spd.hidden = !speed;
+    }
     status.className = 'iso-status' + (tone ? ' iso-status-' + tone : '');
   }
 
@@ -409,7 +416,12 @@
     var key = card.getAttribute('data-iso');
     api('/api/iso/job/' + encodeURIComponent(jobId)).then(function (state) {
       setIsoProgress(card, typeof state.percent === 'number' ? state.percent : 0);
-      setIsoStatus(card, state.message || 'Downloading…', state.state === 'failed' ? 'err' : null);
+      setIsoStatus(
+        card,
+        state.message || 'Downloading…',
+        state.state === 'failed' ? 'err' : null,
+        state.state === 'running' ? (state.speed || '') : ''
+      );
       if (state.state === 'finished') {
         setIsoProgress(card, 100);
         setIsoStatus(card, 'Saved to ' + (state.destPath || 'Downloads'), 'ok');

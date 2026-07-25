@@ -18,7 +18,16 @@ if ($null -eq $plan) { throw "Missing plan.json in $JobDir" }
 
 function Save-IsoStatus {
     param($Value)
-    Write-JsonFile -Path $statusPath -Value $Value
+    # Progress updates are best-effort; never abort a multi-GB download because
+    # status.json was briefly locked by the UI poller.
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        try {
+            Write-JsonFile -Path $statusPath -Value $Value
+            return
+        } catch {
+            Start-Sleep -Milliseconds (40 + ($attempt * 40))
+        }
+    }
 }
 
 $name = Get-Prop $plan 'name' 'ISO'
@@ -36,6 +45,7 @@ $status = [pscustomobject]@{
     name       = $name
     percent    = 0
     message    = 'Preparing'
+    speed      = $null
     destPath   = $null
     error      = $null
     startedAt  = $startedAt
@@ -94,10 +104,13 @@ try {
             $readTotal = [int64]0
             $lastPct = -1
             $lastSave = [datetime]::MinValue
+            $speedMark = Get-Date
+            $speedBytes = [int64]0
 
             while (($n = $input.Read($buffer, 0, $buffer.Length)) -gt 0) {
                 $output.Write($buffer, 0, $n)
                 $readTotal += $n
+                $speedBytes += $n
 
                 $pct = 0
                 if ($total -gt 0) {
@@ -106,6 +119,19 @@ try {
 
                 $now = Get-Date
                 if ($pct -ge ($lastPct + 1) -or ($now - $lastSave).TotalMilliseconds -ge 800) {
+                    $elapsedSec = [math]::Max(0.001, ($now - $speedMark).TotalSeconds)
+                    $bytesPerSec = $speedBytes / $elapsedSec
+                    $speedMark = $now
+                    $speedBytes = [int64]0
+
+                    if ($bytesPerSec -ge 1MB) {
+                        $status.speed = ('{0:N1} MB/s' -f ($bytesPerSec / 1MB))
+                    } elseif ($bytesPerSec -ge 1KB) {
+                        $status.speed = ('{0:N0} KB/s' -f ($bytesPerSec / 1KB))
+                    } else {
+                        $status.speed = ('{0:N0} B/s' -f $bytesPerSec)
+                    }
+
                     $lastPct = $pct
                     $lastSave = $now
                     $mb = [math]::Round($readTotal / 1MB, 1)
@@ -138,6 +164,7 @@ try {
     $status.state = 'finished'
     $status.percent = 100
     $status.message = 'Download complete'
+    $status.speed = $null
     $status.destPath = $destPath
     $status.finishedAt = (Get-Date).ToString('o')
     Save-IsoStatus $status
@@ -148,6 +175,7 @@ try {
     $status.state = 'failed'
     $status.error = $_.Exception.Message
     $status.message = $_.Exception.Message
+    $status.speed = $null
     $status.finishedAt = (Get-Date).ToString('o')
     Save-IsoStatus $status
     exit 1

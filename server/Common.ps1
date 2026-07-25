@@ -65,15 +65,26 @@ function Read-JsonFile {
         $Default = $null
     )
     if (-not (Test-Path -LiteralPath $Path)) { return $Default }
-    # The runner rewrites status.json while the server polls it, so a read can
-    # land mid-write. Retry briefly before giving up.
-    for ($attempt = 0; $attempt -lt 3; $attempt++) {
+    # Share ReadWrite so runners can rewrite status.json while the HTTP server
+    # is mid-poll (File.ReadAllText uses a share that blocks writers).
+    for ($attempt = 0; $attempt -lt 6; $attempt++) {
         try {
-            $raw = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
+            $stream = New-Object System.IO.FileStream(
+                $Path,
+                [System.IO.FileMode]::Open,
+                [System.IO.FileAccess]::Read,
+                [System.IO.FileShare]::ReadWrite
+            )
+            try {
+                $reader = New-Object System.IO.StreamReader($stream, [System.Text.Encoding]::UTF8, $true)
+                try { $raw = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            } finally {
+                $stream.Dispose()
+            }
             if ([string]::IsNullOrWhiteSpace($raw)) { return $Default }
             return ($raw | ConvertFrom-Json)
         } catch {
-            Start-Sleep -Milliseconds 40
+            Start-Sleep -Milliseconds (25 + ($attempt * 25))
         }
     }
     return $Default
@@ -82,7 +93,7 @@ function Read-JsonFile {
 function Write-JsonFile {
     <#
         Writes atomically: the runner rewrites status.json constantly while the
-        server reads it, and a torn read would break the UI.
+        server reads it. Retries when the destination is briefly locked.
     #>
     param(
         [Parameter(Mandatory = $true)] [string]$Path,
@@ -94,8 +105,29 @@ function Write-JsonFile {
     $temp = "$Path.tmp"
     $utf8 = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($temp, $json, $utf8)
-    [System.IO.File]::Copy($temp, $Path, $true)
+
+    $copied = $false
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+        try {
+            [System.IO.File]::Copy($temp, $Path, $true)
+            $copied = $true
+            break
+        } catch {
+            Start-Sleep -Milliseconds (30 + ($attempt * 30))
+        }
+    }
     Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+
+    if (-not $copied) {
+        $bytes = $utf8.GetBytes($json)
+        $stream = New-Object System.IO.FileStream(
+            $Path,
+            [System.IO.FileMode]::Create,
+            [System.IO.FileAccess]::Write,
+            [System.IO.FileShare]::ReadWrite
+        )
+        try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+    }
 }
 
 function Get-CleanConsoleLine {

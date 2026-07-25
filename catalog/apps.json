@@ -50,6 +50,23 @@
       "detect": { "registry": "^Android Studio", "path": "%ProgramFiles%\\Android\\Android Studio\\bin\\studio64.exe" }
     },
     {
+      "key": "vysor",
+      "name": "Vysor",
+      "id": "Vysor.Vysor",
+      "category": "editors",
+      "description": "Mirror and control an Android phone on your PC with mouse and keyboard.",
+      "notes": "Phone needs USB debugging (or wireless ADB). Pro unlocks higher quality / more features.",
+      "detect": { "cmd": "vysor", "registry": "^Vysor" }
+    },
+    {
+      "key": "scrcpy",
+      "name": "scrcpy",
+      "id": "Genymobile.scrcpy",
+      "category": "editors",
+      "description": "Free open-source Android screen mirroring and control (USB / wireless ADB).",
+      "detect": { "cmd": "scrcpy" }
+    },
+    {
       "key": "visualstudio-community",
       "name": "Visual Studio 2022 Community",
       "id": "Microsoft.VisualStudio.2022.Community",

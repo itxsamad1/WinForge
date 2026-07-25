@@ -16,7 +16,7 @@
       "key": "mobile",
       "name": "Android / Mobile",
       "description": "Android Studio with the JDK and SDK environment wired up.",
-      "apps": ["git", "temurin-21", "android-studio", "flutter", "vscode", "windows-terminal"]
+      "apps": ["git", "temurin-21", "android-studio", "vysor", "scrcpy", "flutter", "vscode", "windows-terminal"]
     },
     {
       "key": "python-ai",

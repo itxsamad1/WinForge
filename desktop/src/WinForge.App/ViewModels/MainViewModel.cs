@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Threading;
 using WinForge.Core;
 using WinForge.Core.Models;
@@ -192,7 +193,7 @@ public sealed class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusText = ex.Message;
-            MessageBox.Show(ex.Message, "WinForge", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(ex.Message, "WinForge", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -204,7 +205,7 @@ public sealed class MainViewModel : ViewModelBase
     {
         if (!string.IsNullOrWhiteSpace(policy.Warning))
         {
-            var confirm = MessageBox.Show(policy.Warning + "\n\nContinue?", policy.Name,
+            var confirm = System.Windows.MessageBox.Show(policy.Warning + "\n\nContinue?", policy.Name,
                 MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirm != MessageBoxResult.Yes)
                 return;
@@ -220,7 +221,7 @@ public sealed class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusText = ex.Message;
-            MessageBox.Show(ex.Message, "WinForge", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(ex.Message, "WinForge", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -287,7 +288,7 @@ public sealed class MainViewModel : ViewModelBase
 
         if (plan.Steps.Count == 0)
         {
-            MessageBox.Show("No valid apps selected.", "WinForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show("No valid apps selected.", "WinForge", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -308,7 +309,7 @@ public sealed class MainViewModel : ViewModelBase
             if (!result.Started)
             {
                 StatusText = result.Error ?? "Install could not start";
-                MessageBox.Show(StatusText, "WinForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+                System.Windows.MessageBox.Show(StatusText, "WinForge", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -361,7 +362,8 @@ public sealed class MainViewModel : ViewModelBase
                     MessageBoxButton.OK, MessageBoxImage.Information);
 
             if (status.State == "finished")
-                System.Windows.Forms.MessageBox.Show("Install complete. Open a new terminal for PATH changes.", "WinForge");
+                System.Windows.MessageBox.Show("Install complete. Open a new terminal for PATH changes.", "WinForge",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
 
             await RescanAsync();
         }
@@ -375,7 +377,7 @@ public sealed class MainViewModel : ViewModelBase
         var advanced = SelectedTweaks.Any(t => t.Risk == "advanced");
         if (advanced)
         {
-            var confirm = MessageBox.Show(
+            var confirm = System.Windows.MessageBox.Show(
                 "You selected advanced tweaks. Continue?",
                 "WinForge", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (confirm != MessageBoxResult.Yes) return;
@@ -391,7 +393,7 @@ public sealed class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             StatusText = ex.Message;
-            MessageBox.Show(ex.Message, "WinForge", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(ex.Message, "WinForge", MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {

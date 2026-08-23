@@ -1,12 +1,12 @@
 using System.Drawing;
 using System.Windows;
-using System.Windows.Forms;
+using Forms = System.Windows.Forms;
 
 namespace WinForge.App;
 
 public partial class App : System.Windows.Application
 {
-    private NotifyIcon? _tray;
+    private Forms.NotifyIcon? _tray;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -19,7 +19,7 @@ public partial class App : System.Windows.Application
             return;
         }
 
-        _tray = new NotifyIcon
+        _tray = new Forms.NotifyIcon
         {
             Icon = SystemIcons.Application,
             Visible = true,

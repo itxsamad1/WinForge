@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>WinForge.App</RootNamespace>
+    <AssemblyName>WinForge</AssemblyName>
+    <Version>1.0.0</Version>
+    <Company>WinForge</Company>
+    <Product>WinForge</Product>
+    <Description>Forge your perfect Windows experience</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WinForge.Core\WinForge.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\..\catalog\**\*" Link="catalog\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\..\server\**\*" Link="server\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\engine\**\*" Link="engine\%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Resource Include="Assets\logo-mark.png" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,39 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'cursor/winforge-desktop-*'
+    paths:
+      - 'desktop/**'
+      - 'catalog/**'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Test Core
+        run: dotnet test desktop/tests/WinForge.Core.Tests/WinForge.Core.Tests.csproj -c Release
+
+      - name: Publish WinForge.exe
+        run: |
+          dotnet publish desktop/src/WinForge.App/WinForge.App.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:PublishReadyToRun=true `
+            -o desktop/dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinForge-desktop
+          path: desktop/dist/**

@@ -1,0 +1,34 @@
+{
+  "fixes": [
+    {
+      "key": "reset-network",
+      "name": "Reset network stack",
+      "description": "Flush DNS, reset Winsock, and reset the IP stack (requires reboot).",
+      "script": "fixes/reset-network.ps1"
+    },
+    {
+      "key": "repair-winget",
+      "name": "Repair winget source",
+      "description": "Reset the winget source and update App Installer dependencies.",
+      "script": "fixes/repair-winget.ps1"
+    },
+    {
+      "key": "open-legacy-sound",
+      "name": "Legacy sound settings",
+      "description": "Open the classic Sound control panel.",
+      "panel": "mmsys.cpl"
+    },
+    {
+      "key": "open-control-panel",
+      "name": "Control Panel",
+      "description": "Open the classic Windows Control Panel.",
+      "panel": "control"
+    },
+    {
+      "key": "open-programs",
+      "name": "Programs and Features",
+      "description": "Uninstall or change programs.",
+      "panel": "appwiz.cpl"
+    }
+  ]
+}

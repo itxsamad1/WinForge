@@ -1,0 +1,58 @@
+{
+  "tweaks": [
+    {
+      "key": "show-file-extensions",
+      "name": "Show file extensions",
+      "group": "Essential",
+      "risk": "safe",
+      "description": "Show known file extensions in Explorer.",
+      "applyScript": "tweaks/show-file-extensions-apply.ps1",
+      "undoScript": "tweaks/show-file-extensions-undo.ps1"
+    },
+    {
+      "key": "disable-news-interests",
+      "name": "Disable News and Interests",
+      "group": "Privacy",
+      "risk": "safe",
+      "description": "Turn off the widget feed on the taskbar.",
+      "applyScript": "tweaks/disable-news-interests-apply.ps1",
+      "undoScript": "tweaks/disable-news-interests-undo.ps1"
+    },
+    {
+      "key": "classic-context-menu",
+      "name": "Classic right-click menu",
+      "group": "Desktop",
+      "risk": "safe",
+      "description": "Restore the full Windows 10-style context menu on Windows 11.",
+      "applyScript": "tweaks/classic-context-menu-apply.ps1",
+      "undoScript": "tweaks/classic-context-menu-undo.ps1"
+    },
+    {
+      "key": "disable-copilot",
+      "name": "Disable Copilot button",
+      "group": "Privacy",
+      "risk": "advanced",
+      "description": "Hide the Copilot taskbar button on Windows 11.",
+      "applyScript": "tweaks/disable-copilot-apply.ps1",
+      "undoScript": "tweaks/disable-copilot-undo.ps1"
+    },
+    {
+      "key": "disable-telemetry",
+      "name": "Reduce diagnostic data",
+      "group": "Privacy",
+      "risk": "advanced",
+      "description": "Set diagnostic data collection to minimum where supported.",
+      "applyScript": "tweaks/disable-telemetry-apply.ps1",
+      "undoScript": "tweaks/disable-telemetry-undo.ps1"
+    },
+    {
+      "key": "disable-game-bar",
+      "name": "Disable Xbox Game Bar",
+      "group": "Performance",
+      "risk": "safe",
+      "description": "Turn off the Game Bar overlay and background recording hooks.",
+      "applyScript": "tweaks/disable-game-bar-apply.ps1",
+      "undoScript": "tweaks/disable-game-bar-undo.ps1"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "policies": [
+    {
+      "key": "default",
+      "name": "Default (Microsoft)",
+      "description": "Standard Windows Update behavior.",
+      "script": "updates/default.ps1"
+    },
+    {
+      "key": "security",
+      "name": "Security-focused",
+      "description": "Delay feature updates; security patches after a short grace period.",
+      "warning": "Feature updates may arrive later than usual.",
+      "script": "updates/security.ps1"
+    },
+    {
+      "key": "pause",
+      "name": "Pause updates",
+      "description": "Pause Windows Update for up to 5 weeks.",
+      "warning": "Security patches will also pause. Use temporarily only.",
+      "script": "updates/pause.ps1"
+    }
+  ]
+}

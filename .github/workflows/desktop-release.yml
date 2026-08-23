@@ -4,10 +4,18 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 'cursor/winforge-desktop-*'
+      - 'cursor/**'
     paths:
       - 'desktop/**'
       - 'catalog/**'
+      - '.github/workflows/desktop-release.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'desktop/**'
+      - 'catalog/**'
+      - '.github/workflows/desktop-release.yml'
 
 jobs:
   build:

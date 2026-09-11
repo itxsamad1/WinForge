@@ -10,7 +10,7 @@ public partial class MainWindow : Window
 {
     public MainWindow()
     {
-        Resources.Add("InstalledConverter", new InstalledConverter());
+        Resources["InstalledConverter"] = new InstalledConverter();
         InitializeComponent();
         DataContext = new MainViewModel();
     }

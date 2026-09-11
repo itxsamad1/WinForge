@@ -1,0 +1,6 @@
+<Project>
+  <!-- Allows restoring/compiling Windows-targeted projects on Linux CI/dev. -->
+  <PropertyGroup>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+</Project>

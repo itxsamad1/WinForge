@@ -28,6 +28,22 @@ Think **Ninite**, but for a developer machine, with the PATH work done for you.
 
 ## Quick start
 
+### Desktop app (recommended)
+
+1. Download **`WinForge.exe`** from [GitHub Releases](https://github.com/itxsamad1/WinForge/releases) (or build with `desktop/build/Publish.ps1` on Windows).
+2. Double-click **WinForge.exe** — a native Windows app opens (Install / Tweaks / Config / Updates).
+3. Pick a preset or select apps, press **Install**, accept the one UAC prompt.
+
+```text
+WinForge.exe                          normal launch
+WinForge.exe --preset web --install   CLI: apply Web Dev preset and install
+WinForge.exe --preset web --dry-run   print install plan without installing
+```
+
+No clone, no browser, no console window.
+
+### Web launcher (alternative)
+
 1. Clone this repo (or copy the folder onto a USB stick or download the zip and unzip it).
 2. Double-click **`WinForge.cmd`**.
 3. A browser opens at `http://localhost:47113`.
@@ -45,10 +61,12 @@ Stop with `Ctrl+C` in the console window.
 
 - Windows 10 (build 19041+) or Windows 11
 - `winget` from **App Installer** in the Microsoft Store
-- Nothing else — no Node, no Python, no build step
+- Desktop: self-contained `.exe` (no .NET install required)
+- Web launcher: nothing else — no Node, no Python, no build step
 
 ## Features
 
+- **Native desktop app** — WPF UI with Install, Tweaks, Config, Updates, and Settings (download `WinForge.exe`)
 - **OS ISO downloads** — Windows (official Microsoft page), Ubuntu, Kali, and Parrot with edition + CPU arch pickers; Linux ISOs save under `Downloads\WinForge-ISOs`
 - **Curated catalog** — 100+ apps across editors, runtimes, databases, AI CLIs, media, utilities, and VMs
 - **One-click presets** — Web Dev, Android, Python & AI, Backend, AI Agents, Media
@@ -119,12 +137,14 @@ Needs Windows Sandbox (Pro/Enterprise). Closing the sandbox window destroys ever
 ## Layout
 
 ```text
-WinForge.cmd                double-click entry
+WinForge.exe                desktop app (recommended)
+WinForge.cmd                web launcher entry
 start.ps1                   port, token, browser
 LICENSE / README / .gitignore
-server/                     HTTP API + elevated runner
-catalog/                    apps, presets, postinstall, scripts
-web/                        UI (no build step)
+desktop/                    native WPF app + engine scripts
+server/                     HTTP API + elevated runner (web launcher)
+catalog/                    apps, presets, tweaks, fixes, updates, postinstall, scripts
+web/                        UI (web launcher only)
 tools/                      validate + smoke + sandbox
 docs/images/                brand assets
 state/                      runtime only (gitignored)

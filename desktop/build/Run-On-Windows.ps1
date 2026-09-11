@@ -3,7 +3,7 @@
 .SYNOPSIS
   Check deps, build WinForge desktop if needed, and launch WinForge.exe on Windows.
 .EXAMPLE
-  powershell -NoProfile -ExecutionPolicy Bypass -File desktop\build\Run-On-Windows.ps1
+  powershell -NoProfile -ExecutionPolicy Bypass -File desktop\build\Run-On-Windows.ps1 -SingleFile
 #>
 [CmdletBinding()]
 param(
@@ -29,7 +29,6 @@ $distExe = Join-Path $desktopRoot 'dist\WinForge.exe'
 Write-Host "WinForge desktop launcher" -ForegroundColor Green
 Write-Host "Repo: $repoRoot"
 
-# --- winget (needed by the app for installs) ---
 Write-Step "Checking winget"
 $winget = Get-Command winget -ErrorAction SilentlyContinue
 if (-not $winget) {
@@ -38,7 +37,6 @@ if (-not $winget) {
     Write-Host ("winget OK: " + $winget.Source)
 }
 
-# --- .NET SDK (needed to build) ---
 Write-Step "Checking .NET SDK 8"
 $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
 $hasSdk8 = $false
@@ -57,10 +55,11 @@ if (-not $hasSdk8) {
     $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' +
                 [System.Environment]::GetEnvironmentVariable('Path', 'User')
     $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
-    if (-not $dotnet) { throw ".NET SDK install finished but 'dotnet' is still not on PATH. Open a NEW PowerShell window and re-run." }
+    if (-not $dotnet) {
+        throw ".NET SDK install finished but 'dotnet' is still not on PATH. Open a NEW PowerShell window and re-run."
+    }
 }
 
-# --- Build / reuse dist ---
 if (-not $SkipBuild -or -not (Test-Path $distExe)) {
     Write-Step "Publishing WinForge.exe"
     $publish = Join-Path $desktopRoot 'build\Publish.ps1'
@@ -70,6 +69,7 @@ if (-not $SkipBuild -or -not (Test-Path $distExe)) {
     } else {
         & $publish
     }
+    if (-not $?) { throw "Publish.ps1 failed." }
 }
 
 if (-not (Test-Path $distExe)) {

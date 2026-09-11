@@ -13,6 +13,14 @@ $outDir = [System.IO.Path]::GetFullPath((Join-Path $desktop 'dist'))
 
 Push-Location $desktop
 try {
+    # Old WinForge.exe locks dist\ during publish if still running.
+    $running = Get-Process -Name 'WinForge' -ErrorAction SilentlyContinue
+    if ($running) {
+        Write-Host "Stopping running WinForge process(es) so publish can overwrite dist\..." -ForegroundColor Yellow
+        $running | Stop-Process -Force
+        Start-Sleep -Milliseconds 500
+    }
+
     dotnet restore $sln
     if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed ($LASTEXITCODE)" }
 

@@ -604,6 +604,23 @@
       "detect": { "registry": "^SQL Server Management Studio" }
     },
     {
+      "key": "sql-server-express",
+      "name": "SQL Server 2022 Express",
+      "id": "Microsoft.SQLServer.2022.Express",
+      "category": "databases",
+      "description": "Free SQL Server edition for local development and light workloads.",
+      "popular": true,
+      "detect": { "registry": "^Microsoft SQL Server 2022" }
+    },
+    {
+      "key": "sql-server-developer",
+      "name": "SQL Server 2022 Developer",
+      "id": "Microsoft.SQLServer.2022.Developer",
+      "category": "databases",
+      "description": "Full SQL Server feature set, free for development and testing.",
+      "detect": { "registry": "^Microsoft SQL Server 2022" }
+    },
+    {
       "key": "redis-insight",
       "name": "RedisInsight",
       "id": "RedisInsight.RedisInsight",
@@ -944,6 +961,23 @@
       "detect": { "registry": "^7-Zip" }
     },
     {
+      "key": "winrar",
+      "name": "WinRAR",
+      "id": "RARLab.WinRAR",
+      "category": "utilities",
+      "description": "Popular archive utility for RAR and ZIP files.",
+      "popular": true,
+      "detect": { "registry": "^WinRAR" }
+    },
+    {
+      "key": "treesize-free",
+      "name": "TreeSize Free",
+      "id": "JAMSoftware.TreeSize.Free",
+      "category": "utilities",
+      "description": "Visualize what is using disk space.",
+      "detect": { "registry": "^TreeSize Free" }
+    },
+    {
       "key": "fdm",
       "name": "Free Download Manager",
       "id": "SoftDeluxe.FreeDownloadManager",
@@ -1064,6 +1098,32 @@
       "category": "comms",
       "description": "Chat and meetings for work accounts.",
       "detect": { "registry": "^Microsoft Teams" }
+    },
+    {
+      "key": "anydesk",
+      "name": "AnyDesk",
+      "id": "AnyDesk.AnyDesk",
+      "category": "comms",
+      "description": "Lightweight remote desktop for support and access.",
+      "popular": true,
+      "detect": { "registry": "^AnyDesk" }
+    },
+    {
+      "key": "ultraviewer",
+      "name": "UltraViewer",
+      "id": "DucFabulous.UltraViewer",
+      "category": "comms",
+      "description": "Remote desktop popular for quick support sessions.",
+      "popular": true,
+      "detect": { "registry": "^UltraViewer" }
+    },
+    {
+      "key": "teamviewer",
+      "name": "TeamViewer",
+      "id": "TeamViewer.TeamViewer",
+      "category": "comms",
+      "description": "Remote access and support across devices.",
+      "detect": { "registry": "^TeamViewer" }
     }
   ]
 }

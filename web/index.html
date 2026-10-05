@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=13">
 <link rel="icon" type="image/png" href="assets/logo-mark.png">
 </head>
 <body>
@@ -39,7 +39,10 @@
       <div id="activity-panel" class="activity-panel" hidden>
         <div class="activity-panel-head">
           <strong>Downloads &amp; installs</strong>
-          <button id="activity-refresh" class="link-btn" type="button">Refresh</button>
+          <div class="activity-panel-actions">
+            <button id="activity-cancel-all" class="link-btn danger-link" type="button" hidden>Cancel all</button>
+            <button id="activity-refresh" class="link-btn" type="button">Refresh</button>
+          </div>
         </div>
         <div id="activity-list" class="activity-list">
           <p class="activity-empty">Nothing running right now.</p>
@@ -119,7 +122,10 @@
         <h2 id="progress-title">Installing</h2>
         <p id="progress-sub" class="progress-sub">Starting...</p>
       </div>
-      <button id="progress-close" class="ghost-btn">Close</button>
+      <div class="progress-actions">
+        <button id="progress-cancel" class="ghost-btn danger-btn" type="button" hidden>Cancel</button>
+        <button id="progress-close" class="ghost-btn">Close</button>
+      </div>
     </header>
 
     <div class="progress-meta">

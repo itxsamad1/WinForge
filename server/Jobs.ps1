@@ -134,6 +134,252 @@ function Get-JobLogLines {
     }
 }
 
+function Test-InstallProcessAlive {
+    param($PidValue)
+    if ($null -eq $PidValue) { return $false }
+    try {
+        $proc = Get-Process -Id ([int]$PidValue) -ErrorAction Stop
+        return ($null -ne $proc -and -not $proc.HasExited)
+    } catch {
+        return $false
+    }
+}
+
+function Test-IsTerminalJobState {
+    param([string]$State)
+    return $State -in @('finished', 'failed', 'cancelled')
+}
+
+function Stop-ProcessTree {
+    param([Parameter(Mandatory = $true)] [int]$ProcessId)
+    try {
+        & taskkill.exe /PID $ProcessId /T /F 2>$null | Out-Null
+    } catch {
+        try { Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue } catch { }
+    }
+}
+
+function Write-CancelledJobStatus {
+    param(
+        [Parameter(Mandatory = $true)] [string]$JobDir,
+        [string]$Message = 'Cancelled by user.'
+    )
+
+    $statusPath = Join-Path $JobDir 'status.json'
+    $status = Read-JsonFile -Path $statusPath
+    if ($null -eq $status) { return $null }
+
+    $state = Get-Prop $status 'state' 'unknown'
+    if (Test-IsTerminalJobState -State $state) { return $status }
+
+    $status.state = 'cancelled'
+    Set-ObjectProp -Object $status -Name 'finishedAt' -Value ((Get-Date).ToString('o'))
+    Set-ObjectProp -Object $status -Name 'cancelMessage' -Value $Message
+    foreach ($entry in @(ConvertTo-Array (Get-Prop $status 'steps'))) {
+        $stepState = Get-Prop $entry 'state' 'pending'
+        if ($stepState -in @('pending', 'running', 'starting')) {
+            Set-ObjectProp -Object $entry -Name 'state' -Value 'cancelled'
+            if ([string]::IsNullOrWhiteSpace((Get-Prop $entry 'message'))) {
+                Set-ObjectProp -Object $entry -Name 'message' -Value $Message
+            }
+            Set-ObjectProp -Object $entry -Name 'finishedAt' -Value ((Get-Date).ToString('o'))
+            Set-ObjectProp -Object $entry -Name 'percent' -Value $null
+        }
+    }
+    Write-JsonFile -Path $statusPath -Value $status
+    return $status
+}
+
+function Write-StaleJobStatus {
+    param(
+        [Parameter(Mandatory = $true)] [string]$JobDir,
+        [string]$Message = 'Installer process is no longer running.'
+    )
+
+    $statusPath = Join-Path $JobDir 'status.json'
+    $status = Read-JsonFile -Path $statusPath
+    if ($null -eq $status) { return $null }
+
+    $state = Get-Prop $status 'state' 'unknown'
+    if (Test-IsTerminalJobState -State $state) { return $status }
+
+    $status.state = 'failed'
+    Set-ObjectProp -Object $status -Name 'finishedAt' -Value ((Get-Date).ToString('o'))
+    Set-ObjectProp -Object $status -Name 'stale' -Value $true
+    Set-ObjectProp -Object $status -Name 'launchError' -Value $Message
+    foreach ($entry in @(ConvertTo-Array (Get-Prop $status 'steps'))) {
+        $stepState = Get-Prop $entry 'state' 'pending'
+        if ($stepState -in @('pending', 'running', 'starting')) {
+            Set-ObjectProp -Object $entry -Name 'state' -Value 'failed'
+            if ([string]::IsNullOrWhiteSpace((Get-Prop $entry 'message'))) {
+                Set-ObjectProp -Object $entry -Name 'message' -Value $Message
+            }
+            Set-ObjectProp -Object $entry -Name 'finishedAt' -Value ((Get-Date).ToString('o'))
+            Set-ObjectProp -Object $entry -Name 'percent' -Value $null
+        }
+    }
+    Write-JsonFile -Path $statusPath -Value $status
+    return $status
+}
+
+function Request-JobCancel {
+    <#
+        Soft-cancel: drop a flag the runner checks between steps, then kill the
+        process tree so a stuck winget does not keep the UI "installing".
+    #>
+    param(
+        [Parameter(Mandatory = $true)] [hashtable]$Context,
+        [Parameter(Mandatory = $true)] [string]$JobId
+    )
+
+    if ($JobId -notmatch '^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$') {
+        return [pscustomobject]@{ ok = $false; error = 'Invalid job id.' }
+    }
+
+    $jobDir = Join-Path $Context.JobsDir $JobId
+    if (-not (Test-Path -LiteralPath $jobDir -PathType Container)) {
+        return [pscustomobject]@{ ok = $false; error = 'Unknown job.' }
+    }
+
+    $cancelFlag = Join-Path $jobDir 'cancel.flag'
+    Set-Content -LiteralPath $cancelFlag -Value ((Get-Date).ToString('o')) -Encoding ASCII -Force
+
+    $status = Read-JsonFile -Path (Join-Path $jobDir 'status.json')
+    if ($null -eq $status) {
+        return [pscustomobject]@{ ok = $false; error = 'Missing status.' }
+    }
+
+    $state = Get-Prop $status 'state' 'unknown'
+    if (Test-IsTerminalJobState -State $state) {
+        return [pscustomobject]@{ ok = $true; alreadyDone = $true; state = $state; jobId = $JobId }
+    }
+
+    $pidValue = Get-Prop $status 'pid'
+    if ($null -ne $pidValue -and (Test-InstallProcessAlive -PidValue $pidValue)) {
+        Stop-ProcessTree -ProcessId ([int]$pidValue)
+        Start-Sleep -Milliseconds 250
+    }
+
+    # Also kill orphaned Launch-Job / powershell children that may still linger
+    # before the elevated runner wrote its pid.
+    $status = Write-CancelledJobStatus -JobDir $jobDir -Message 'Cancelled by user.'
+    return [pscustomobject]@{
+        ok     = $true
+        jobId  = $JobId
+        state  = if ($null -ne $status) { Get-Prop $status 'state' 'cancelled' } else { 'cancelled' }
+    }
+}
+
+function Request-CancelAllJobs {
+    param([Parameter(Mandatory = $true)] [hashtable]$Context)
+
+    $cancelled = @()
+    $jobsDir = $Context.JobsDir
+    if ([string]::IsNullOrWhiteSpace($jobsDir) -or -not (Test-Path -LiteralPath $jobsDir)) {
+        return [pscustomobject]@{ ok = $true; cancelled = @(); count = 0 }
+    }
+
+    $dirs = Get-ChildItem -LiteralPath $jobsDir -Directory -ErrorAction SilentlyContinue
+    foreach ($dir in $dirs) {
+        if ($dir.Name -notmatch '^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$') { continue }
+        $status = Read-JsonFile -Path (Join-Path $dir.FullName 'status.json')
+        if ($null -eq $status) { continue }
+        $state = Get-Prop $status 'state' 'unknown'
+        if (Test-IsTerminalJobState -State $state) { continue }
+        $result = Request-JobCancel -Context $Context -JobId $dir.Name
+        if ($result.ok -and -not $result.alreadyDone) {
+            $cancelled += $dir.Name
+        }
+    }
+
+    return [pscustomobject]@{
+        ok        = $true
+        cancelled = @($cancelled)
+        count     = @($cancelled).Count
+    }
+}
+
+function Reconcile-InstallJob {
+    param(
+        [Parameter(Mandatory = $true)] [string]$JobDir,
+        $Status = $null
+    )
+
+    $statusPath = Join-Path $JobDir 'status.json'
+    if ($null -eq $Status) {
+        $Status = Read-JsonFile -Path $statusPath
+    }
+    if ($null -eq $Status) { return $null }
+
+    $state = Get-Prop $Status 'state' 'unknown'
+    if (Test-IsTerminalJobState -State $state) { return $Status }
+
+    $cancelFlag = Join-Path $JobDir 'cancel.flag'
+    if (Test-Path -LiteralPath $cancelFlag) {
+        return Write-CancelledJobStatus -JobDir $JobDir -Message 'Cancelled by user.'
+    }
+
+    $pidValue = Get-Prop $Status 'pid'
+    $alive = Test-InstallProcessAlive -PidValue $pidValue
+
+    if ($alive) { return $Status }
+
+    # No live runner. awaiting_elevation / starting can be briefly pid-less while
+    # Launch-Job is still prompting UAC — only mark stale after a grace window,
+    # or immediately when a pid was recorded and has since died.
+    $statusFile = Get-Item -LiteralPath $statusPath -ErrorAction SilentlyContinue
+    $ageMinutes = if ($null -ne $statusFile) {
+        ((Get-Date) - $statusFile.LastWriteTime).TotalMinutes
+    } else { 999 }
+
+    if ($null -ne $pidValue) {
+        return Write-StaleJobStatus -JobDir $JobDir `
+            -Message 'Installer process is no longer running.'
+    }
+
+    if ($state -in @('awaiting_elevation', 'starting') -and $ageMinutes -lt 3) {
+        return $Status
+    }
+
+    if ($ageMinutes -ge 2) {
+        $msg = if ($state -eq 'awaiting_elevation') {
+            'UAC prompt was not accepted, or the installer never started.'
+        } else {
+            'Installer process is no longer running.'
+        }
+        return Write-StaleJobStatus -JobDir $JobDir -Message $msg
+    }
+
+    return $Status
+}
+
+function Reconcile-AllInstallJobs {
+    param([Parameter(Mandatory = $true)] [hashtable]$Context)
+
+    $jobsDir = $Context.JobsDir
+    if ([string]::IsNullOrWhiteSpace($jobsDir)) {
+        $jobsDir = Join-Path $Context.StateDir 'jobs'
+    }
+    if ([string]::IsNullOrWhiteSpace($jobsDir) -or -not (Test-Path -LiteralPath $jobsDir)) {
+        return 0
+    }
+
+    $fixed = 0
+    $dirs = Get-ChildItem -LiteralPath $jobsDir -Directory -ErrorAction SilentlyContinue
+    foreach ($dir in $dirs) {
+        if ($dir.Name -notmatch '^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$') { continue }
+        $before = Read-JsonFile -Path (Join-Path $dir.FullName 'status.json')
+        if ($null -eq $before) { continue }
+        $beforeState = Get-Prop $before 'state' 'unknown'
+        if (Test-IsTerminalJobState -State $beforeState) { continue }
+        $after = Reconcile-InstallJob -JobDir $dir.FullName -Status $before
+        if ($null -ne $after -and (Get-Prop $after 'state') -ne $beforeState) {
+            $fixed++
+        }
+    }
+    return $fixed
+}
+
 function Get-JobState {
     param(
         [Parameter(Mandatory = $true)] [hashtable]$Context,
@@ -149,7 +395,7 @@ function Get-JobState {
     $jobDir = Join-Path $Context.JobsDir $JobId
     if (-not (Test-Path -LiteralPath $jobDir -PathType Container)) { return $null }
 
-    $status = Read-JsonFile -Path (Join-Path $jobDir 'status.json')
+    $status = Reconcile-InstallJob -JobDir $jobDir
     if ($null -eq $status) { return $null }
 
     $logs = @{}
@@ -183,12 +429,12 @@ function Get-ActivitySnapshot {
             Select-Object -First 12
         foreach ($dir in $dirs) {
             if ($dir.Name -notmatch '^[0-9]{8}-[0-9]{6}-[0-9a-f]{6}$') { continue }
-            $status = Read-JsonFile -Path (Join-Path $dir.FullName 'status.json')
+            $status = Reconcile-InstallJob -JobDir $dir.FullName
             if ($null -eq $status) { continue }
             $steps = @(ConvertTo-Array (Get-Prop $status 'steps'))
             $running = $steps | Where-Object { (Get-Prop $_ 'state') -eq 'running' } | Select-Object -First 1
             $done = @($steps | Where-Object { (Get-Prop $_ 'state') -in @('done', 'manual') }).Count
-            $failed = @($steps | Where-Object { (Get-Prop $_ 'state') -eq 'failed' }).Count
+            $failed = @($steps | Where-Object { (Get-Prop $_ 'state') -in @('failed', 'cancelled') }).Count
             $label = if ($null -ne $running) {
                 Get-Prop $running 'name' 'Installing'
             } elseif ($steps.Count -gt 0) {
@@ -202,14 +448,16 @@ function Get-ActivitySnapshot {
             } elseif ($steps.Count -gt 0) {
                 $pct = [int][math]::Round(100.0 * ($done + $failed) / $steps.Count)
             }
+            $jobState = Get-Prop $status 'state' 'unknown'
             $installs += [pscustomobject]@{
-                kind    = 'install'
-                jobId   = Get-Prop $status 'jobId' $dir.Name
-                state   = Get-Prop $status 'state' 'unknown'
-                name    = $label
-                detail  = if ($null -ne $running) { Get-Prop $running 'phase' } else { $null }
-                percent = $pct
-                message = if ($null -ne $running) { Get-Prop $running 'message' } else { $null }
+                kind      = 'install'
+                jobId     = Get-Prop $status 'jobId' $dir.Name
+                state     = $jobState
+                name      = $label
+                detail    = if ($null -ne $running) { Get-Prop $running 'phase' } else { $null }
+                percent   = $pct
+                message   = if ($null -ne $running) { Get-Prop $running 'message' } else { Get-Prop $status 'cancelMessage' }
+                canCancel = -not (Test-IsTerminalJobState -State $jobState)
             }
         }
     }
@@ -276,12 +524,12 @@ function Get-ActivitySnapshot {
         }
     }
 
-    $activeCount = @($installs | Where-Object { $_.state -notin @('finished', 'failed') }).Count +
+    $activeCount = @($installs | Where-Object { -not (Test-IsTerminalJobState -State $_.state) }).Count +
         @($isos | Where-Object { $_.state -in @('queued', 'running') -or $_.alive }).Count
 
     # Running jobs first so the Activity panel is useful at a glance.
     $isos = @($isos | Sort-Object @{ Expression = { if ($_.state -eq 'running' -or $_.alive) { 0 } else { 1 } } }, @{ Expression = { if ($null -eq $_.percent) { -1 } else { -[int]$_.percent } } })
-    $installs = @($installs | Sort-Object @{ Expression = { if ($_.state -notin @('finished', 'failed')) { 0 } else { 1 } } })
+    $installs = @($installs | Sort-Object @{ Expression = { if (-not (Test-IsTerminalJobState -State $_.state)) { 0 } else { 1 } } })
 
     return [pscustomobject]@{
         activeCount = $activeCount

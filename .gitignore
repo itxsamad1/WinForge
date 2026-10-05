@@ -4,7 +4,6 @@ state/
 Thumbs.db
 *.wsb
 
-# Desktop build output
-desktop/**/bin/
-desktop/**/obj/
-desktop/dist/
+# Electron
+desktop-electron/node_modules/
+desktop-electron/dist/

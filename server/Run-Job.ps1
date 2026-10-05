@@ -44,6 +44,8 @@ $context = @{
 # Status bookkeeping
 # ---------------------------------------------------------------------------
 
+$cancelFlagPath = Join-Path $JobDir 'cancel.flag'
+
 $status = [pscustomobject]@{
     jobId       = Get-Prop $plan 'jobId'
     state       = 'running'
@@ -51,7 +53,12 @@ $status = [pscustomobject]@{
     finishedAt  = $null
     elevated    = $context.Elevated
     rebootNeeded = $false
+    pid         = $PID
     steps       = @()
+}
+
+function Test-JobCancelRequested {
+    return (Test-Path -LiteralPath $cancelFlagPath)
 }
 
 $index = 0
@@ -239,6 +246,22 @@ function Invoke-CatalogScript {
 function Invoke-JobSteps {
     $stepIndex = 0
     foreach ($step in $steps) {
+        if (Test-JobCancelRequested) {
+            $status.state = 'cancelled'
+            $status.cancelMessage = 'Cancelled by user.'
+            for ($i = $stepIndex; $i -lt $status.steps.Count; $i++) {
+                $skip = $status.steps[$i]
+                if ($skip.state -in @('pending', 'running', 'starting')) {
+                    $skip.state = 'cancelled'
+                    $skip.message = 'Cancelled by user.'
+                    $skip.finishedAt = (Get-Date).ToString('o')
+                    $skip.percent = $null
+                }
+            }
+            Save-Status
+            return
+        }
+
         $entry = $status.steps[$stepIndex]
         $script:CurrentLogPath = Join-Path $logDir $entry.logFile
         $script:CurrentStepEntry = $entry
@@ -256,23 +279,34 @@ function Invoke-JobSteps {
 
         $kind = Get-Prop $step 'kind' 'winget'
         $failed = $false
+        $cancelled = $false
 
         try {
             switch ($kind) {
                 'winget' {
                     $exitCode = Invoke-WingetInstall -Step $step
-                    $entry.exitCode = $exitCode
-                    $verdict = Get-WingetExitMessage -ExitCode $exitCode
-                    $entry.message = $verdict.message
-                    if ($verdict.reboot) { $status.rebootNeeded = $true }
-                    if (-not $verdict.ok) { $failed = $true }
+                    if (Test-JobCancelRequested) {
+                        $cancelled = $true
+                        $entry.message = 'Cancelled by user.'
+                    } else {
+                        $entry.exitCode = $exitCode
+                        $verdict = Get-WingetExitMessage -ExitCode $exitCode
+                        $entry.message = $verdict.message
+                        if ($verdict.reboot) { $status.rebootNeeded = $true }
+                        if (-not $verdict.ok) { $failed = $true }
+                    }
                 }
                 'script' {
                     $command = Get-Prop $step 'command'
                     $scriptPath = Join-Path $root "catalog\scripts\$command.ps1"
                     Invoke-CatalogScript -ScriptPath $scriptPath -Options $options
-                    $entry.message = 'Completed'
-                    $entry.exitCode = 0
+                    if (Test-JobCancelRequested) {
+                        $cancelled = $true
+                        $entry.message = 'Cancelled by user.'
+                    } else {
+                        $entry.message = 'Completed'
+                        $entry.exitCode = 0
+                    }
                 }
                 'manual' {
                     Write-StepLog (Get-Prop $step 'instructions' 'This app must be installed by hand.')
@@ -289,9 +323,33 @@ function Invoke-JobSteps {
                 }
             }
         } catch {
-            $failed = $true
-            $entry.message = $_.Exception.Message
-            Write-StepLog "ERROR: $($_.Exception.Message)"
+            if (Test-JobCancelRequested) {
+                $cancelled = $true
+                $entry.message = 'Cancelled by user.'
+            } else {
+                $failed = $true
+                $entry.message = $_.Exception.Message
+                Write-StepLog "ERROR: $($_.Exception.Message)"
+            }
+        }
+
+        if ($cancelled) {
+            $entry.state = 'cancelled'
+            $entry.percent = $null
+            $entry.finishedAt = (Get-Date).ToString('o')
+            $script:CurrentStepEntry = $null
+            $status.state = 'cancelled'
+            $status.cancelMessage = 'Cancelled by user.'
+            for ($i = $stepIndex + 1; $i -lt $status.steps.Count; $i++) {
+                $skip = $status.steps[$i]
+                if ($skip.state -eq 'pending') {
+                    $skip.state = 'cancelled'
+                    $skip.message = 'Cancelled by user.'
+                    $skip.finishedAt = (Get-Date).ToString('o')
+                }
+            }
+            Save-Status
+            return
         }
 
         if (Get-Prop $step 'reboot' $false) { $status.rebootNeeded = $true }
@@ -301,6 +359,7 @@ function Invoke-JobSteps {
         # a broken path.
         if (-not $failed -and $entry.state -ne 'manual') {
             foreach ($postStep in (ConvertTo-Array (Get-Prop $step 'postInstall'))) {
+                if (Test-JobCancelRequested) { break }
                 Update-PathFromRegistry
                 Write-StepLog ''
                 Write-StepLog "--- post-install: $postStep ---"
@@ -340,13 +399,23 @@ try {
     # Always publish a terminal state. If this script dies unexpectedly the UI
     # would otherwise poll a job stuck at "running" forever.
     $script:CurrentLogPath = $null
-    if ($status.state -eq 'running') { $status.state = 'finished' }
+    $wasCancelled = (Test-JobCancelRequested) -or ($status.state -eq 'cancelled')
+    if ($status.state -eq 'running') {
+        $status.state = if ($wasCancelled) { 'cancelled' } else { 'finished' }
+    }
     $status.finishedAt = (Get-Date).ToString('o')
+    if ($wasCancelled -and [string]::IsNullOrWhiteSpace((Get-Prop $status 'cancelMessage'))) {
+        $status.cancelMessage = 'Cancelled by user.'
+    }
     foreach ($entry in $status.steps) {
         if ($entry.state -eq 'running' -or $entry.state -eq 'pending') {
-            $entry.state = 'failed'
+            $entry.state = if ($wasCancelled) { 'cancelled' } else { 'failed' }
             if ([string]::IsNullOrWhiteSpace($entry.message)) {
-                $entry.message = 'The installer stopped before this step completed.'
+                $entry.message = if ($wasCancelled) {
+                    'Cancelled by user.'
+                } else {
+                    'The installer stopped before this step completed.'
+                }
             }
         }
     }

@@ -35,24 +35,6 @@
       "description": "Hide the Copilot taskbar button on Windows 11.",
       "applyScript": "tweaks/disable-copilot-apply.ps1",
       "undoScript": "tweaks/disable-copilot-undo.ps1"
-    },
-    {
-      "key": "disable-telemetry",
-      "name": "Reduce diagnostic data",
-      "group": "Privacy",
-      "risk": "advanced",
-      "description": "Set diagnostic data collection to minimum where supported.",
-      "applyScript": "tweaks/disable-telemetry-apply.ps1",
-      "undoScript": "tweaks/disable-telemetry-undo.ps1"
-    },
-    {
-      "key": "disable-game-bar",
-      "name": "Disable Xbox Game Bar",
-      "group": "Performance",
-      "risk": "safe",
-      "description": "Turn off the Game Bar overlay and background recording hooks.",
-      "applyScript": "tweaks/disable-game-bar-apply.ps1",
-      "undoScript": "tweaks/disable-game-bar-undo.ps1"
     }
   ]
 }

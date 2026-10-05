@@ -36,6 +36,7 @@
     activityPanel: document.getElementById('activity-panel'),
     activityList: document.getElementById('activity-list'),
     activityRefresh: document.getElementById('activity-refresh'),
+    activityCancelAll: document.getElementById('activity-cancel-all'),
     selectionBar: document.getElementById('selection-bar'),
     selectionCount: document.getElementById('selection-count'),
     selectionLabel: document.getElementById('selection-label'),
@@ -57,6 +58,7 @@
     progressEta: document.getElementById('progress-eta'),
     progressSteps: document.getElementById('progress-steps'),
     progressSummary: document.getElementById('progress-summary'),
+    progressCancel: document.getElementById('progress-cancel'),
     progressClose: document.getElementById('progress-close')
   };
 
@@ -128,7 +130,7 @@
 
   function stepProgressValue(step) {
     if (step.state === 'done' || step.state === 'manual') { return 100; }
-    if (step.state === 'failed') { return 100; }
+    if (step.state === 'failed' || step.state === 'cancelled') { return 100; }
     if (step.state === 'running') {
       var percent = typeof step.percent === 'number' ? step.percent : parseInt(step.percent, 10);
       if (isNaN(percent)) { percent = 8; }
@@ -185,8 +187,10 @@
         var detail = running.progressDetail ? ' · ' + running.progressDetail : '';
         var stepPct = stepProgressValue(running);
         el.progressPhase.textContent = phase + ' · ' + running.name + ' · ' + stepPct + '%' + detail;
-      } else if (status.state === 'finished' || status.state === 'failed') {
-        el.progressPhase.textContent = status.state === 'failed' ? 'Finished with errors' : 'Complete';
+      } else if (status.state === 'finished' || status.state === 'failed' || status.state === 'cancelled') {
+        el.progressPhase.textContent = status.state === 'cancelled'
+          ? 'Cancelled'
+          : (status.state === 'failed' ? 'Finished with errors' : 'Complete');
       } else {
         el.progressPhase.textContent = 'Preparing';
       }
@@ -214,9 +218,13 @@
 
   // ---------------------------------------------------------------- activity
 
+  function isTerminalJobState(state) {
+    return state === 'finished' || state === 'failed' || state === 'cancelled';
+  }
+
   function activityStateClass(state) {
     if (state === 'finished' || state === 'done') { return 'is-ok'; }
-    if (state === 'failed') { return 'is-err'; }
+    if (state === 'failed' || state === 'cancelled') { return 'is-err'; }
     if (state === 'running' || state === 'queued' || state === 'starting' || state === 'awaiting_elevation') {
       return 'is-running';
     }
@@ -227,6 +235,7 @@
     if (state === 'awaiting_elevation') { return 'UAC'; }
     if (state === 'finished') { return 'Done'; }
     if (state === 'failed') { return 'Failed'; }
+    if (state === 'cancelled') { return 'Cancelled'; }
     if (state === 'running') { return 'Running'; }
     if (state === 'queued' || state === 'starting') { return 'Starting'; }
     return state || '';
@@ -241,6 +250,9 @@
     }
     if (el.activityBtn) {
       el.activityBtn.classList.toggle('has-active', active > 0);
+    }
+    if (el.activityCancelAll) {
+      el.activityCancelAll.hidden = active <= 0;
     }
 
     var items = [];
@@ -262,8 +274,14 @@
       var bar = pct == null ? '' :
         '<div class="activity-item-bar"><div class="activity-item-fill" style="width:' + Math.max(0, Math.min(100, pct)) + '%"></div></div>';
       var metaClass = 'activity-item-meta ' + activityStateClass(item.state);
-      return '<button type="button" class="activity-item" data-kind="' + escapeHtml(item.kind) +
+      var canCancel = item.kind === 'install' && item.canCancel !== false && !isTerminalJobState(item.state);
+      var cancelBtn = canCancel
+        ? '<button type="button" class="activity-cancel-btn" data-cancel-job="' +
+          escapeHtml(item.jobId || '') + '" title="Cancel this install">Cancel</button>'
+        : '';
+      return '<div class="activity-item-wrap" data-kind="' + escapeHtml(item.kind) +
         '" data-job="' + escapeHtml(item.jobId || '') + '" data-key="' + escapeHtml(item.key || '') + '">' +
+        '<button type="button" class="activity-item">' +
         '<div class="activity-item-top">' +
         '<span class="activity-item-name">' + escapeHtml(item.name || 'Job') + '</span>' +
         '<span class="' + metaClass + '">' + escapeHtml(activityStateLabel(item.state)) +
@@ -271,8 +289,31 @@
         '<div class="activity-item-row">' +
         '<span class="activity-item-msg">' + escapeHtml(msg) + '</span>' +
         (speed ? '<span class="activity-item-speed">' + escapeHtml(speed) + '</span>' : '') +
-        '</div>' + bar + '</button>';
+        '</div>' + bar + '</button>' + cancelBtn + '</div>';
     }).join('');
+  }
+
+  function cancelJob(jobId) {
+    if (!jobId) { return Promise.resolve(); }
+    return api('/api/job/' + encodeURIComponent(jobId) + '/cancel', { method: 'POST', body: '{}' }).then(function () {
+      if (job && job.id === jobId) {
+        if (el.progressCancel) { el.progressCancel.hidden = true; }
+        el.progressTitle.textContent = 'Cancelling…';
+        el.progressSub.textContent = 'Stopping installer processes.';
+      }
+      return loadActivity();
+    });
+  }
+
+  function cancelAllJobs() {
+    return api('/api/jobs/cancel-all', { method: 'POST', body: '{}' }).then(function (data) {
+      if (job && el.progressCancel) { el.progressCancel.hidden = true; }
+      if (job) {
+        el.progressTitle.textContent = 'Cancelling…';
+        el.progressSub.textContent = 'Stopping ' + (data.count || 'all') + ' install job(s).';
+      }
+      return loadActivity();
+    });
   }
 
   function loadActivity() {
@@ -317,6 +358,7 @@
     el.progressTitle.textContent = 'Installing';
     el.progressSummary.hidden = true;
     el.progressClose.hidden = false;
+    if (el.progressCancel) { el.progressCancel.hidden = false; }
     pollJob();
   }
 
@@ -758,6 +800,7 @@
     el.progressSummary.hidden = true;
     el.progressSummary.innerHTML = '';
     el.progressClose.hidden = false;
+    if (el.progressCancel) { el.progressCancel.hidden = false; }
     el.progressFill.style.width = '0%';
     el.progressSteps.innerHTML = '';
     el.progressPanel.hidden = false;
@@ -807,12 +850,16 @@
 
     api(query).then(function (data) {
       renderJob(data);
-      var finished = data.status.state === 'finished' || data.status.state === 'failed';
+      var finished = isTerminalJobState(data.status.state);
+      if (el.progressCancel) {
+        el.progressCancel.hidden = finished;
+      }
       if (!finished) {
         job.timer = setTimeout(pollJob, 500);
       } else if (data.status.launchError) {
         // Already surfaced by renderJob; just unlock the UI.
         el.progressClose.hidden = false;
+        if (el.progressCancel) { el.progressCancel.hidden = true; }
         el.installBtn.disabled = false;
         job.timer = null;
       } else {
@@ -841,7 +888,7 @@
     }
 
     var doneCount = steps.filter(function (step) {
-      return step.state === 'done' || step.state === 'failed' || step.state === 'manual';
+      return step.state === 'done' || step.state === 'failed' || step.state === 'manual' || step.state === 'cancelled';
     }).length;
 
     updateProgressMeta(status);
@@ -975,6 +1022,7 @@
       if (step.state === 'pending') { pctEl.textContent = ''; }
       else if (step.state === 'done') { pctEl.textContent = '100%'; }
       else if (step.state === 'failed') { pctEl.textContent = 'failed'; }
+      else if (step.state === 'cancelled') { pctEl.textContent = 'cancelled'; }
       else if (step.state === 'manual') { pctEl.textContent = 'manual'; }
       else { pctEl.textContent = pct + '%'; }
     }
@@ -1002,6 +1050,7 @@
   function finishJob(status) {
     var steps = status.steps || [];
     var failed = steps.filter(function (step) { return step.state === 'failed'; });
+    var cancelled = steps.filter(function (step) { return step.state === 'cancelled'; });
     var manual = steps.filter(function (step) { return step.state === 'manual'; });
     var done = steps.filter(function (step) { return step.state === 'done'; });
 
@@ -1009,9 +1058,17 @@
     if (el.progressPercent) { el.progressPercent.textContent = '100%'; }
     if (el.progressEta) { el.progressEta.textContent = 'done'; }
     updateProgressMeta(status);
-    el.progressTitle.textContent = failed.length ? 'Finished with problems' : 'All done';
-    el.progressSub.textContent = done.length + ' of ' + steps.length + ' installed successfully.';
+    if (status.state === 'cancelled' || cancelled.length) {
+      el.progressTitle.textContent = 'Cancelled';
+      el.progressSub.textContent = done.length
+        ? (done.length + ' finished before cancel · ' + cancelled.length + ' skipped.')
+        : 'Install stopped. Nothing else will run.';
+    } else {
+      el.progressTitle.textContent = failed.length ? 'Finished with problems' : 'All done';
+      el.progressSub.textContent = done.length + ' of ' + steps.length + ' installed successfully.';
+    }
     el.progressClose.hidden = false;
+    if (el.progressCancel) { el.progressCancel.hidden = true; }
     el.installBtn.disabled = false;
 
     // Manual steps finish instantly — make sure instructions are visible and logs loaded.
@@ -1042,6 +1099,9 @@
     });
     failed.forEach(function (step) {
       items.push('<li class="tone-err">' + escapeHtml(step.name) + ' failed: ' + escapeHtml(step.message || 'unknown error') + '</li>');
+    });
+    cancelled.forEach(function (step) {
+      items.push('<li class="tone-warn">' + escapeHtml(step.name) + ' cancelled.</li>');
     });
 
     el.progressSummary.innerHTML = '<h3>What next</h3><ul>' + items.join('') + '</ul>';
@@ -1174,12 +1234,38 @@
       loadActivity();
     });
   }
+  if (el.activityCancelAll) {
+    el.activityCancelAll.addEventListener('click', function (event) {
+      event.stopPropagation();
+      el.activityCancelAll.disabled = true;
+      cancelAllJobs()
+        .catch(function (error) {
+          showBanner('Could not cancel installs: ' + escapeHtml(error.message || 'unknown error'), 'err');
+        })
+        .then(function () {
+          el.activityCancelAll.disabled = false;
+        });
+    });
+  }
   if (el.activityList) {
     el.activityList.addEventListener('click', function (event) {
+      var cancelBtn = event.target.closest('[data-cancel-job]');
+      if (cancelBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        var cancelId = cancelBtn.getAttribute('data-cancel-job');
+        cancelBtn.disabled = true;
+        cancelJob(cancelId).catch(function (error) {
+          showBanner('Could not cancel: ' + escapeHtml(error.message || 'unknown error'), 'err');
+          cancelBtn.disabled = false;
+        });
+        return;
+      }
+      var wrap = event.target.closest('.activity-item-wrap');
       var item = event.target.closest('.activity-item');
-      if (!item) { return; }
-      var kind = item.getAttribute('data-kind');
-      var jobId = item.getAttribute('data-job');
+      if (!item || !wrap) { return; }
+      var kind = wrap.getAttribute('data-kind');
+      var jobId = wrap.getAttribute('data-job');
       openActivityPanel(false);
       if (kind === 'install') {
         resumeInstallJob(jobId);
@@ -1187,9 +1273,7 @@
         activeCategory = 'os';
         renderCategories();
         renderApps();
-        var key = null;
-        // Prefer matching card from activity payload via data attributes on button
-        var isoKey = item.getAttribute('data-key');
+        var isoKey = wrap.getAttribute('data-key');
         if (isoKey) {
           attachIsoJobToCard(isoKey, jobId, { message: 'Reconnected…' });
         }
@@ -1208,6 +1292,20 @@
     el.progressPanel.hidden = true;
     // Keep polling in the background so Activity stays up to date.
   });
+
+  if (el.progressCancel) {
+    el.progressCancel.addEventListener('click', function () {
+      if (!job || !job.id) { return; }
+      el.progressCancel.disabled = true;
+      cancelJob(job.id)
+        .catch(function (error) {
+          showBanner('Could not cancel: ' + escapeHtml(error.message || 'unknown error'), 'err');
+        })
+        .then(function () {
+          el.progressCancel.disabled = false;
+        });
+    });
+  }
 
   el.progressSteps.addEventListener('click', function (event) {
     var openBtn = event.target.closest('[data-open-app]');
@@ -1244,6 +1342,10 @@
   }
 
   // ---------------------------------------------------------------- boot
+
+  if (window.location.search.indexOf('desktop=1') !== -1 || (window.winforgeDesktop && window.winforgeDesktop.isDesktop)) {
+    document.body.classList.add('desktop-app');
+  }
 
   if (!token) {
     showBanner('<strong>No session token.</strong> Open WinForge through <code>WinForge.cmd</code> rather than typing the address by hand.', 'err');

@@ -113,6 +113,28 @@ function Invoke-ApiRoute {
             return
         }
 
+        '^/api/job/[^/]+/cancel$' {
+            if ($method -ne 'POST') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use POST' }; return }
+            $trimmed = $route.TrimEnd('/')
+            $parts = $trimmed.Split('/')
+            # /api/job/{id}/cancel -> parts: '', 'api', 'job', '{id}', 'cancel'
+            $jobId = $parts[3]
+            $result = Request-JobCancel -Context $Context -JobId $jobId
+            if (-not $result.ok) {
+                $code = if ($result.error -eq 'Unknown job.') { 404 } else { 400 }
+                Write-JsonResponse -Response $Response -StatusCode $code -Value @{ error = $result.error }
+                return
+            }
+            Write-JsonResponse -Response $Response -Value $result
+            return
+        }
+
+        '^/api/jobs/cancel-all$' {
+            if ($method -ne 'POST') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use POST' }; return }
+            Write-JsonResponse -Response $Response -Value (Request-CancelAllJobs -Context $Context)
+            return
+        }
+
         '^/api/job/[^/]+$' {
             if ($method -ne 'GET') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use GET' }; return }
             $jobId = $route.Substring($route.LastIndexOf('/') + 1)

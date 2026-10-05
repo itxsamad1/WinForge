@@ -30,17 +30,22 @@ Think **Ninite**, but for a developer machine, with the PATH work done for you.
 
 ### Desktop app (recommended)
 
-1. Download **`WinForge.exe`** from [GitHub Releases](https://github.com/itxsamad1/WinForge/releases) (or build with `desktop/build/Publish.ps1` on Windows).
-2. Double-click **WinForge.exe** — a native Windows app opens (Install / Tweaks / Config / Updates).
+1. Download **`WinForge-Portable.exe`** (Electron) or the NSIS installer from [GitHub Releases](https://github.com/itxsamad1/WinForge/releases).
+2. Double-click — a native desktop window opens with the full catalog.
 3. Pick a preset or select apps, press **Install**, accept the one UAC prompt.
+4. Use **Cancel** on the progress panel or Activity list to stop a running batch (or **Cancel all**).
 
-```text
-WinForge.exe                          normal launch
-WinForge.exe --preset web --install   CLI: apply Web Dev preset and install
-WinForge.exe --preset web --dry-run   print install plan without installing
+To build the Electron app yourself:
+
+```powershell
+cd desktop-electron
+npm install
+npm run dist
 ```
 
-No clone, no browser, no console window.
+```text
+WinForge-Portable.exe                 normal launch
+```
 
 ### Web launcher (alternative)
 
@@ -61,14 +66,16 @@ Stop with `Ctrl+C` in the console window.
 
 - Windows 10 (build 19041+) or Windows 11
 - `winget` from **App Installer** in the Microsoft Store
-- Desktop: self-contained `.exe` (no .NET install required)
-- Web launcher: nothing else — no Node, no Python, no build step
+- Desktop: Electron portable `.exe` (build with `desktop-electron`; no separate .NET runtime)
+- Web launcher: nothing else — no Node, no Python, no build step to *run*
 
 ## Features
 
-- **Native desktop app** — WPF UI with Install, Tweaks, Config, Updates, and Settings (download `WinForge.exe`)
+- **Native desktop app** — Electron UI (Install / Activity / Cancel) — download `WinForge-Portable.exe`
+- **Cancel installs** — stop one job or cancel all from the progress panel / Activity
+- **Stale-job cleanup** — reopening after closing the app no longer leaves ghost "installing" rows
 - **OS ISO downloads** — Windows (official Microsoft page), Ubuntu, Kali, and Parrot with edition + CPU arch pickers; Linux ISOs save under `Downloads\WinForge-ISOs`
-- **Curated catalog** — 100+ apps across editors, runtimes, databases, AI CLIs, media, utilities, and VMs
+- **Curated catalog** — 100+ apps across editors, runtimes, databases, remote tools, AI CLIs, media, utilities, and VMs
 - **One-click presets** — Web Dev, Android, Python & AI, Backend, AI Agents, Media
 - **Live install UI** — per-app logs, percent, phase, elapsed time, and ETA
 - **Already-installed detection** — registry + PATH + winget export
@@ -137,14 +144,14 @@ Needs Windows Sandbox (Pro/Enterprise). Closing the sandbox window destroys ever
 ## Layout
 
 ```text
-WinForge.exe                desktop app (recommended)
+WinForge-Portable.exe       Electron desktop app (recommended)
 WinForge.cmd                web launcher entry
 start.ps1                   port, token, browser
 LICENSE / README / .gitignore
-desktop/                    native WPF app + engine scripts
-server/                     HTTP API + elevated runner (web launcher)
+desktop-electron/           Electron shell (loads the same web UI)
+server/                     HTTP API + elevated runner
 catalog/                    apps, presets, tweaks, fixes, updates, postinstall, scripts
-web/                        UI (web launcher only)
+web/                        UI (shared by web launcher + Electron)
 tools/                      validate + smoke + sandbox
 docs/images/                brand assets
 state/                      runtime only (gitignored)

@@ -51,12 +51,36 @@ function ConvertTo-Array {
     <#
         ConvertFrom-Json yields a bare value for single-element arrays in some
         paths and $null for absent ones. Normalise everything to an array.
+
+        Important: PSCustomObject implements IEnumerable (its properties), so we
+        must not expand a lone object into property values.
     #>
     param($Value)
     if ($null -eq $Value) { return @() }
     if ($Value -is [string]) { return , @($Value) }
+    if ($Value -is [System.Management.Automation.PSCustomObject]) { return , @($Value) }
+    if ($Value -is [hashtable]) { return , @($Value) }
+    if ($Value -is [System.Collections.IDictionary]) { return , @($Value) }
     if ($Value -is [System.Collections.IEnumerable]) { return @($Value) }
     return , @($Value)
+}
+
+function Set-ObjectProp {
+    <#
+        Set or add a note property on a PSCustomObject from ConvertFrom-Json.
+    #>
+    param(
+        [Parameter(Mandatory = $true)] $Object,
+        [Parameter(Mandatory = $true)] [string]$Name,
+        $Value
+    )
+    if ($null -eq $Object) { return }
+    $existing = $Object.PSObject.Properties[$Name]
+    if ($null -ne $existing) {
+        $existing.Value = $Value
+    } else {
+        $Object | Add-Member -NotePropertyName $Name -NotePropertyValue $Value -Force
+    }
 }
 
 function Read-JsonFile {

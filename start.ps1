@@ -68,6 +68,20 @@ $script:WinForge = @{
     Elevated   = Test-IsElevated
 }
 
+if (-not (Test-Path $script:WinForge.JobsDir)) {
+    New-Item -ItemType Directory -Path $script:WinForge.JobsDir -Force | Out-Null
+}
+
+# Clear ghost "installing" rows left behind when a previous session was killed.
+try {
+    $fixed = Reconcile-AllInstallJobs -Context $script:WinForge
+    if ($fixed -gt 0) {
+        Write-Host "  Cleared $fixed stale install job(s) from a previous session." -ForegroundColor DarkYellow
+    }
+} catch {
+    # Non-fatal — UI can still reconcile on poll.
+}
+
 $url = "http://localhost:$Port/?token=$token"
 
 # Publish the session so tools\Smoke-Test.ps1 can drive the API. The token

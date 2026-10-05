@@ -1,0 +1,78 @@
+{
+  "name": "winforge",
+  "version": "1.0.0",
+  "description": "Forge your perfect Windows experience — one-click winget setup",
+  "main": "src/main.js",
+  "author": "WinForge",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis portable",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.winforge.app",
+    "productName": "WinForge",
+    "copyright": "MIT",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../catalog",
+        "to": "catalog"
+      },
+      {
+        "from": "../server",
+        "to": "server"
+      },
+      {
+        "from": "../web",
+        "to": "web"
+      },
+      {
+        "from": "../start.ps1",
+        "to": "start.ps1"
+      },
+      {
+        "from": "../docs/images/logo-mark.png",
+        "to": "logo-mark.png"
+      }
+    ],
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "${productName}-${version}-${os}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "WinForge"
+    },
+    "portable": {
+      "artifactName": "WinForge-Portable.exe"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}

@@ -124,6 +124,9 @@ function Send-StaticFile {
         Write-HttpResponse -Response $Response -StatusCode 403 -Body 'Forbidden'
         return
     }
+    if ((Test-Path -LiteralPath $fullPath -PathType Container)) {
+        $fullPath = Join-Path $fullPath 'index.html'
+    }
     if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
         Write-HttpResponse -Response $Response -StatusCode 404 -Body 'Not found'
         return

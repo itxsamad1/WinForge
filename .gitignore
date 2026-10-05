@@ -1,9 +1,9 @@
-state/
+﻿state/
 *.log
 .DS_Store
 Thumbs.db
 *.wsb
 
-# Electron
+# Electron build junk (portable exe is published under releases/)
 desktop-electron/node_modules/
 desktop-electron/dist/

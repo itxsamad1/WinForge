@@ -212,13 +212,13 @@ function Get-WingetProgressInfo {
     elseif ($Line -match '(?i)Successfully verified installer hash') {
         $phase = 'verifying'; $percent = 72
     }
-    elseif ($Line -match '(?i)Starting package install') {
+    elseif ($Line -match '(?i)Starting package (install|upgrade)') {
         $phase = 'installing'; $percent = 78
     }
-    elseif ($Line -match '(?i)Successfully installed') {
+    elseif ($Line -match '(?i)Successfully (installed|upgraded|updated)') {
         $phase = 'done'; $percent = 100
     }
-    elseif ($Line -match '(?i)already installed') {
+    elseif ($Line -match '(?i)(already installed|no applicable update|no newer package versions)') {
         $phase = 'done'; $percent = 100
     }
 

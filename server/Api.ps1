@@ -113,6 +113,91 @@ function Invoke-ApiRoute {
             return
         }
 
+        '^/api/upgrade$' {
+            if ($method -ne 'POST') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use POST' }; return }
+
+            $body = Read-RequestBody -Request $Request
+            if ($null -eq $body) {
+                Write-JsonResponse -Response $Response -StatusCode 400 -Value @{ error = 'Expected a JSON body.' }
+                return
+            }
+
+            $keys = @()
+            $upgradeAll = [bool](Get-Prop $body 'all' $false)
+            if ($upgradeAll) {
+                $installedState = Get-InstalledState -Context $Context
+                $appsMap = Get-Prop $installedState 'apps'
+                if ($null -ne $appsMap) {
+                    foreach ($app in (Get-CatalogApps)) {
+                        $key = Get-Prop $app 'key'
+                        $kind = Get-Prop $app 'kind' 'winget'
+                        $id = Get-Prop $app 'id'
+                        if ($kind -ne 'winget' -or [string]::IsNullOrWhiteSpace($id)) { continue }
+                        $entry = $null
+                        if ($appsMap -is [hashtable] -or $appsMap -is [System.Collections.IDictionary]) {
+                            if ($appsMap.ContainsKey($key)) { $entry = $appsMap[$key] }
+                        } else {
+                            $entry = Get-Prop $appsMap $key
+                        }
+                        if ($null -ne $entry -and [bool](Get-Prop $entry 'installed' $false)) {
+                            $keys += $key
+                        }
+                    }
+                }
+            } else {
+                foreach ($key in (ConvertTo-Array (Get-Prop $body 'apps'))) {
+                    if ($key -is [string]) { $keys += $key }
+                }
+            }
+
+            if ($keys.Count -eq 0) {
+                Write-JsonResponse -Response $Response -StatusCode 400 -Value @{
+                    error = $(if ($upgradeAll) {
+                        'No installed catalog apps are available to update via winget.'
+                    } else {
+                        'Select at least one app to update.'
+                    })
+                }
+                return
+            }
+            if ($keys.Count -gt 200) {
+                Write-JsonResponse -Response $Response -StatusCode 400 -Value @{ error = 'Too many apps in one batch.' }
+                return
+            }
+
+            $plan = Resolve-UpgradePlan -Keys $keys
+            if ($plan.steps.Count -eq 0) {
+                Write-JsonResponse -Response $Response -StatusCode 400 -Value @{
+                    error   = 'None of the selected apps can be updated via winget.'
+                    unknown = @($plan.unknown)
+                    skipped = @($plan.skipped)
+                }
+                return
+            }
+
+            $options = Get-SanitizedOptions -Raw (Get-Prop $body 'options')
+            $job = New-InstallJob -Context $Context -Plan $plan -Options $options
+
+            if (-not $job.started) {
+                Write-JsonResponse -Response $Response -StatusCode 403 -Value @{
+                    error  = 'Administrator approval was declined, so nothing was updated.'
+                    detail = $job.error
+                    jobId  = $job.jobId
+                }
+                return
+            }
+
+            Write-JsonResponse -Response $Response -Value ([pscustomobject]@{
+                jobId          = $job.jobId
+                needsElevation = [bool]$job.needsElevation
+                mode           = 'upgrade'
+                steps          = @($plan.steps | ForEach-Object { [pscustomobject]@{ key = $_.key; name = $_.name; kind = $_.kind } })
+                unknown        = @($plan.unknown)
+                skipped        = @($plan.skipped)
+            })
+            return
+        }
+
         '^/api/job/[^/]+/cancel$' {
             if ($method -ne 'POST') { Write-JsonResponse -Response $Response -StatusCode 405 -Value @{ error = 'Use POST' }; return }
             $trimmed = $route.TrimEnd('/')

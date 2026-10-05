@@ -177,3 +177,66 @@ function Resolve-InstallPlan {
         unknown = $unknown
     }
 }
+
+function Resolve-UpgradePlan {
+    <#
+        Turns catalog keys into winget-upgrade steps. Only winget-backed apps
+        with a package id are eligible; script/manual entries are skipped.
+        Order follows the same "after" edges as install when multiple keys are
+        requested, so dependent tools still run in a safe sequence.
+    #>
+    param([Parameter(Mandatory = $true)] [string[]]$Keys)
+
+    if ($null -ne $script:CatalogContext) { Ensure-CatalogFresh -Context $script:CatalogContext }
+
+    $requested = @()
+    $unknown = @()
+    $skipped = @()
+    foreach ($key in $Keys) {
+        if ([string]::IsNullOrWhiteSpace($key)) { continue }
+        if ($requested -contains $key) { continue }
+        if (-not $script:CatalogApps.ContainsKey($key)) {
+            $unknown += $key
+            continue
+        }
+        $app = $script:CatalogApps[$key]
+        $kind = Get-Prop $app 'kind' 'winget'
+        $id = Get-Prop $app 'id'
+        if ($kind -ne 'winget' -or [string]::IsNullOrWhiteSpace($id)) {
+            $skipped += $key
+            continue
+        }
+        $requested += $key
+    }
+
+    $ordered = New-Object System.Collections.ArrayList
+    $state = @{}
+    foreach ($key in $requested) {
+        Add-OrderedApp -Key $key -Requested $requested -State $state -Ordered $ordered
+    }
+
+    $steps = @()
+    foreach ($key in $ordered) {
+        $app = $script:CatalogApps[$key]
+        $steps += [pscustomobject]@{
+            key          = $key
+            name         = Get-Prop $app 'name' $key
+            kind         = 'upgrade'
+            id           = Get-Prop $app 'id'
+            scope        = Get-Prop $app 'scope'
+            source       = Get-Prop $app 'source' 'winget'
+            override     = $null
+            command      = $null
+            url          = $null
+            instructions = $null
+            postInstall  = @()
+            reboot       = [bool](Get-Prop $app 'requiresRestart' $false)
+        }
+    }
+
+    return [pscustomobject]@{
+        steps   = $steps
+        unknown = $unknown
+        skipped = $skipped
+    }
+}

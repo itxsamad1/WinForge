@@ -606,6 +606,28 @@ code {
   vertical-align: 1px;
 }
 
+.app-update-btn {
+  flex-shrink: 0;
+  align-self: center;
+  margin-left: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.app-update-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0, 120, 255, 0.08);
+}
+
 .app-card .checkbox {
   flex-shrink: 0;
   width: 18px;

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=13">
+<link rel="stylesheet" href="styles.css?v=14">
 <link rel="icon" type="image/png" href="assets/logo-mark.png">
 </head>
 <body>
@@ -49,6 +49,7 @@
         </div>
       </div>
     </div>
+    <button id="upgrade-all" class="ghost-btn" title="Update all installed catalog apps via winget">Update all</button>
     <button id="refresh-installed" class="ghost-btn" title="Re-scan what is already installed">Rescan</button>
   </div>
 </header>
@@ -87,6 +88,7 @@
   <div class="selection-actions">
     <button id="deselect-all" class="ghost-btn" type="button" title="Clear the current selection">Deselect all</button>
     <button id="configure-btn" class="ghost-btn">Options</button>
+    <button id="upgrade-btn" class="ghost-btn" type="button" hidden>Update</button>
     <button id="install-btn" class="primary-btn">Install</button>
   </div>
 </div>
@@ -145,6 +147,6 @@
   </div>
 </div>
 
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

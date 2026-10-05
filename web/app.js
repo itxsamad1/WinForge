@@ -20,11 +20,13 @@
   var activityTimer = null;
   var activityOpen = false;
 
-  var job = null;          // { id, steps, logOffsets, expanded, timer }
+  var job = null;          // { id, steps, logOffsets, expanded, timer, mode }
+  var jobMode = 'install'; // 'install' | 'upgrade'
 
   var el = {
     search: document.getElementById('search'),
     refresh: document.getElementById('refresh-installed'),
+    upgradeAll: document.getElementById('upgrade-all'),
     banners: document.getElementById('banner-area'),
     categoryNav: document.getElementById('category-nav'),
     presetList: document.getElementById('preset-list'),
@@ -42,6 +44,7 @@
     selectionLabel: document.getElementById('selection-label'),
     selectionNames: document.getElementById('selection-names'),
     installBtn: document.getElementById('install-btn'),
+    upgradeBtn: document.getElementById('upgrade-btn'),
     configureBtn: document.getElementById('configure-btn'),
     optionsModal: document.getElementById('options-modal'),
     optGitName: document.getElementById('opt-git-name'),
@@ -355,10 +358,11 @@
       softProgress: {}
     };
     el.progressPanel.hidden = false;
-    el.progressTitle.textContent = 'Installing';
+    el.progressTitle.textContent = jobMode === 'upgrade' ? 'Updating' : 'Installing';
     el.progressSummary.hidden = true;
     el.progressClose.hidden = false;
     if (el.progressCancel) { el.progressCancel.hidden = false; }
+    setJobButtonsDisabled(true);
     pollJob();
   }
 
@@ -370,6 +374,8 @@
       if (!data.wingetFound) {
         showBanner('<strong>winget was not found.</strong> Install "App Installer" from the Microsoft Store, then restart WinForge. Nothing can be installed until then.', 'err');
         el.installBtn.disabled = true;
+        if (el.upgradeBtn) { el.upgradeBtn.disabled = true; }
+        if (el.upgradeAll) { el.upgradeAll.disabled = true; }
       } else if (data.elevated) {
         showBanner('Running as Administrator — installs will not ask for a UAC prompt.', 'ok');
       }
@@ -740,6 +746,39 @@
     });
   }
 
+  function isWingetUpgradable(app) {
+    if (!app) { return false; }
+    var kind = app.kind || 'winget';
+    return kind === 'winget' && !!app.id;
+  }
+
+  function isAppInstalled(key) {
+    var state = installedByKey[key];
+    return !!(state && state.installed);
+  }
+
+  function getUpgradableKeys(keys) {
+    return (keys || []).filter(function (key) {
+      var app = catalogAppForKey(key);
+      return isAppInstalled(key) && isWingetUpgradable(app);
+    });
+  }
+
+  function getAllInstalledUpgradableKeys() {
+    return (catalog.apps || [])
+      .filter(function (app) {
+        return isAppInstalled(app.key) && isWingetUpgradable(app);
+      })
+      .map(function (app) { return app.key; });
+  }
+
+  function setJobButtonsDisabled(disabled) {
+    var blocked = disabled || catalog.wingetFound === false;
+    el.installBtn.disabled = blocked;
+    if (el.upgradeBtn) { el.upgradeBtn.disabled = blocked; }
+    if (el.upgradeAll) { el.upgradeAll.disabled = blocked; }
+  }
+
   function renderCard(app) {
     var state = installedByKey[app.key];
     var isInstalled = state && state.installed;
@@ -752,6 +791,10 @@
     else if (app.kind === 'script') { tag = '<span class="app-tag">Script</span>'; }
 
     var note = app.notes ? '<div class="app-note">' + escapeHtml(app.notes) + '</div>' : '';
+    var updateBtn = (isInstalled && isWingetUpgradable(app))
+      ? '<button type="button" class="app-update-btn" data-upgrade-key="' +
+        escapeHtml(app.key) + '" title="Update this app via winget">Update</button>'
+      : '';
 
     return '<div class="' + classes.join(' ') + '" data-key="' + escapeHtml(app.key) + '" role="checkbox" ' +
       'tabindex="0" aria-checked="' + (selected.has(app.key) ? 'true' : 'false') + '">' +
@@ -760,7 +803,7 @@
       '<div class="app-name">' + escapeHtml(app.name) + '</div>' +
       '<div class="app-desc">' + escapeHtml(app.description || '') + '</div>' +
       note + tag +
-      '</div></div>';
+      '</div>' + updateBtn + '</div>';
   }
 
   function renderSelection() {
@@ -773,6 +816,14 @@
       .filter(function (app) { return selected.has(app.key); })
       .map(function (app) { return app.name; });
     el.selectionNames.textContent = names.length ? names.join(', ') : '';
+
+    var upgradable = getUpgradableKeys(Array.from(selected));
+    if (el.upgradeBtn) {
+      el.upgradeBtn.hidden = upgradable.length === 0;
+      el.upgradeBtn.textContent = upgradable.length === 1
+        ? 'Update'
+        : ('Update ' + upgradable.length);
+    }
   }
 
   function toggleApp(key) {
@@ -785,18 +836,13 @@
     renderSelection();
   }
 
-  // ---------------------------------------------------------------- install
+  // ---------------------------------------------------------------- install / upgrade
 
-  function startInstall() {
-    var keys = Array.from(selected);
-    if (!keys.length) { return; }
-
-    readOptionsFromForm();
-    el.installBtn.disabled = true;
-    el.progressSub.textContent = catalog.elevated
-      ? 'Starting installer...'
-      : 'Look for the Windows security prompt — it may be behind this window.';
-    el.progressTitle.textContent = 'Installing';
+  function openJobProgress(mode, startingText) {
+    jobMode = mode;
+    setJobButtonsDisabled(true);
+    el.progressSub.textContent = startingText;
+    el.progressTitle.textContent = mode === 'upgrade' ? 'Updating' : 'Installing';
     el.progressSummary.hidden = true;
     el.progressSummary.innerHTML = '';
     el.progressClose.hidden = false;
@@ -808,32 +854,85 @@
     if (el.progressPhase) { el.progressPhase.textContent = 'Starting'; }
     if (el.progressElapsed) { el.progressElapsed.textContent = '0s'; }
     if (el.progressEta) { el.progressEta.textContent = '—'; }
+  }
+
+  function beginJobFromResponse(data) {
+    job = {
+      id: data.jobId,
+      mode: jobMode,
+      expanded: new Set(),
+      logOffsets: {},
+      lastState: {},
+      timer: null,
+      startedAt: Date.now()
+    };
+    if (data.needsElevation) {
+      el.progressSub.textContent = 'Accept the Windows security prompt if it appears (Alt+Tab if you do not see it).';
+    } else {
+      var noun = jobMode === 'upgrade' ? 'update' : 'step';
+      el.progressSub.textContent = 'Running ' + data.steps.length + ' ' + noun +
+        (data.steps.length === 1 ? '' : 's') + '.';
+    }
+    pollJob();
+    loadActivity();
+  }
+
+  function startInstall() {
+    var keys = Array.from(selected);
+    if (!keys.length) { return; }
+
+    readOptionsFromForm();
+    openJobProgress(
+      'install',
+      catalog.elevated
+        ? 'Starting installer...'
+        : 'Look for the Windows security prompt — it may be behind this window.'
+    );
 
     api('/api/install', {
       method: 'POST',
       body: JSON.stringify({ apps: keys, options: options })
-    }).then(function (data) {
-      job = {
-        id: data.jobId,
-        expanded: new Set(),
-        logOffsets: {},
-        lastState: {},
-        timer: null,
-        startedAt: Date.now()
-      };
-      if (data.needsElevation) {
-        el.progressSub.textContent = 'Accept the Windows security prompt if it appears (Alt+Tab if you do not see it).';
-      } else {
-        el.progressSub.textContent = 'Running ' + data.steps.length + ' step' + (data.steps.length === 1 ? '' : 's') + '.';
-      }
-      pollJob();
-      loadActivity();
-    }).catch(function (error) {
+    }).then(beginJobFromResponse).catch(function (error) {
       el.progressTitle.textContent = 'Could not start';
       el.progressSub.textContent = error.message;
       el.progressClose.hidden = false;
-      el.installBtn.disabled = false;
+      setJobButtonsDisabled(false);
     });
+  }
+
+  function startUpgrade(keys) {
+    keys = keys || getUpgradableKeys(Array.from(selected));
+    if (!keys.length) {
+      showBanner('No installed winget apps selected to update.', 'err');
+      return;
+    }
+
+    readOptionsFromForm();
+    openJobProgress(
+      'upgrade',
+      catalog.elevated
+        ? 'Starting updates...'
+        : 'Look for the Windows security prompt — it may be behind this window.'
+    );
+
+    api('/api/upgrade', {
+      method: 'POST',
+      body: JSON.stringify({ apps: keys, options: options })
+    }).then(beginJobFromResponse).catch(function (error) {
+      el.progressTitle.textContent = 'Could not start';
+      el.progressSub.textContent = error.message;
+      el.progressClose.hidden = false;
+      setJobButtonsDisabled(false);
+    });
+  }
+
+  function startUpgradeAll() {
+    var keys = getAllInstalledUpgradableKeys();
+    if (!keys.length) {
+      showBanner('No installed catalog apps are ready to update yet. Try Rescan first.', 'err');
+      return;
+    }
+    startUpgrade(keys);
   }
 
   function pollJob() {
@@ -860,7 +959,7 @@
         // Already surfaced by renderJob; just unlock the UI.
         el.progressClose.hidden = false;
         if (el.progressCancel) { el.progressCancel.hidden = true; }
-        el.installBtn.disabled = false;
+        setJobButtonsDisabled(false);
         job.timer = null;
       } else {
         finishJob(data.status);
@@ -868,7 +967,7 @@
     }).catch(function (error) {
       el.progressSub.textContent = 'Lost contact with the installer: ' + error.message;
       el.progressClose.hidden = false;
-      el.installBtn.disabled = false;
+      setJobButtonsDisabled(false);
     });
   }
 
@@ -876,15 +975,25 @@
     var status = data.status;
     var steps = status.steps || [];
 
+    if (steps.some(function (step) { return step.kind === 'upgrade'; })) {
+      jobMode = 'upgrade';
+    } else if (steps.length) {
+      jobMode = 'install';
+    }
+
     if (status.state === 'awaiting_elevation') {
       el.progressSub.textContent = 'Accept the Windows security prompt if it appears (Alt+Tab if you do not see it).';
     } else if (status.state === 'starting') {
-      el.progressSub.textContent = 'Starting installer...';
+      el.progressSub.textContent = jobMode === 'upgrade' ? 'Starting updates...' : 'Starting installer...';
     } else if (status.state === 'failed' && status.launchError) {
       el.progressTitle.textContent = 'Could not start';
       el.progressSub.textContent = status.launchError;
       el.progressClose.hidden = false;
-      el.installBtn.disabled = false;
+      setJobButtonsDisabled(false);
+    }
+
+    if (!el.progressPanel.hidden && !isTerminalJobState(status.state)) {
+      el.progressTitle.textContent = jobMode === 'upgrade' ? 'Updating' : 'Installing';
     }
 
     var doneCount = steps.filter(function (step) {
@@ -1053,6 +1162,8 @@
     var cancelled = steps.filter(function (step) { return step.state === 'cancelled'; });
     var manual = steps.filter(function (step) { return step.state === 'manual'; });
     var done = steps.filter(function (step) { return step.state === 'done'; });
+    var isUpgrade = jobMode === 'upgrade';
+    var doneVerb = isUpgrade ? 'updated' : 'installed';
 
     el.progressFill.style.width = '100%';
     if (el.progressPercent) { el.progressPercent.textContent = '100%'; }
@@ -1062,14 +1173,14 @@
       el.progressTitle.textContent = 'Cancelled';
       el.progressSub.textContent = done.length
         ? (done.length + ' finished before cancel · ' + cancelled.length + ' skipped.')
-        : 'Install stopped. Nothing else will run.';
+        : ((isUpgrade ? 'Update' : 'Install') + ' stopped. Nothing else will run.');
     } else {
       el.progressTitle.textContent = failed.length ? 'Finished with problems' : 'All done';
-      el.progressSub.textContent = done.length + ' of ' + steps.length + ' installed successfully.';
+      el.progressSub.textContent = done.length + ' of ' + steps.length + ' ' + doneVerb + ' successfully.';
     }
     el.progressClose.hidden = false;
     if (el.progressCancel) { el.progressCancel.hidden = true; }
-    el.installBtn.disabled = false;
+    setJobButtonsDisabled(false);
 
     // Manual steps finish instantly — make sure instructions are visible and logs loaded.
     manual.forEach(function (step) {
@@ -1081,7 +1192,7 @@
 
     var items = [];
     if (done.length) {
-      items.push('<li class="tone-ok">' + done.length + ' app' + (done.length === 1 ? '' : 's') + ' installed.</li>');
+      items.push('<li class="tone-ok">' + done.length + ' app' + (done.length === 1 ? '' : 's') + ' ' + doneVerb + '.</li>');
     }
     items.push('<li>Open a <strong>new</strong> terminal before using the new commands. Existing windows still hold the old PATH.</li>');
     if (status.rebootNeeded) {
@@ -1150,6 +1261,13 @@
         event.preventDefault();
         startIsoDownload(event.target.closest('.iso-card'));
       }
+      return;
+    }
+    var upgradeBtn = event.target.closest('[data-upgrade-key]');
+    if (upgradeBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      startUpgrade([upgradeBtn.getAttribute('data-upgrade-key')]);
       return;
     }
     var card = event.target.closest('.app-card');
@@ -1221,6 +1339,12 @@
   });
 
   el.installBtn.addEventListener('click', startInstall);
+  if (el.upgradeBtn) {
+    el.upgradeBtn.addEventListener('click', function () { startUpgrade(); });
+  }
+  if (el.upgradeAll) {
+    el.upgradeAll.addEventListener('click', startUpgradeAll);
+  }
 
   if (el.activityBtn) {
     el.activityBtn.addEventListener('click', function (event) {

@@ -150,18 +150,24 @@ function Get-WingetExitMessage {
         raw number to a user setting up a laptop is useless, so translate the
         ones that actually come up.
     #>
-    param([int]$ExitCode)
+    param(
+        [int]$ExitCode,
+        [ValidateSet('install', 'upgrade')]
+        [string]$Mode = 'install'
+    )
+
+    $doneVerb = if ($Mode -eq 'upgrade') { 'Updated' } else { 'Installed' }
 
     switch ($ExitCode) {
-        0            { return @{ ok = $true;  reboot = $false; message = 'Installed' } }
-        3010         { return @{ ok = $true;  reboot = $true;  message = 'Installed, reboot required' } }
-        1641         { return @{ ok = $true;  reboot = $true;  message = 'Installed, the installer requested a restart' } }
-        -1978335189  { return @{ ok = $true;  reboot = $false; message = 'Already installed and up to date' } }
-        -1978335135  { return @{ ok = $true;  reboot = $false; message = 'Already installed' } }
+        0            { return @{ ok = $true;  reboot = $false; message = $doneVerb } }
+        3010         { return @{ ok = $true;  reboot = $true;  message = "$doneVerb, reboot required" } }
+        1641         { return @{ ok = $true;  reboot = $true;  message = "$doneVerb, the installer requested a restart" } }
+        -1978335189  { return @{ ok = $true;  reboot = $false; message = 'Already up to date' } }
+        -1978335135  { return @{ ok = $true;  reboot = $false; message = $(if ($Mode -eq 'upgrade') { 'Already up to date' } else { 'Already installed' }) } }
         -1978335212  { return @{ ok = $false; reboot = $false; message = 'No package matched that id in the winget source' } }
         -1978335215  { return @{ ok = $false; reboot = $false; message = 'No installer available for this machine (architecture or scope mismatch)' } }
         -1978335216  { return @{ ok = $false; reboot = $false; message = 'Installer hash mismatch, the publisher may have republished the package' } }
-        -1978334967  { return @{ ok = $false; reboot = $false; message = 'A newer version is already installed' } }
+        -1978334967  { return @{ ok = $true;  reboot = $false; message = 'Already up to date (newer or same version present)' } }
         -1978335231  { return @{ ok = $false; reboot = $false; message = 'Installer failed. See the log above for the vendor error' } }
         -1978335226  { return @{ ok = $false; reboot = $false; message = 'The installer needs administrator rights' } }
         -1978334972  { return @{ ok = $false; reboot = $false; message = 'Another installation is already in progress' } }
@@ -173,12 +179,15 @@ function Get-WingetExitMessage {
     return @{ ok = $false; reboot = $false; message = "winget exited with code $ExitCode" }
 }
 
-function Invoke-WingetInstall {
-    param($Step)
+function Invoke-WingetCommand {
+    param(
+        [Parameter(Mandatory = $true)] [ValidateSet('install', 'upgrade')] [string]$Action,
+        [Parameter(Mandatory = $true)] $Step
+    )
 
     $id = Get-Prop $Step 'id'
     $arguments = @(
-        'install',
+        $Action,
         '--id', $id,
         '--exact',
         '--source', (Get-Prop $Step 'source' 'winget'),
@@ -194,9 +203,11 @@ function Invoke-WingetInstall {
         $arguments += @('--scope', $scope)
     }
 
-    $override = Get-Prop $Step 'override'
-    if (-not [string]::IsNullOrWhiteSpace($override)) {
-        $arguments += @('--override', $override)
+    if ($Action -eq 'install') {
+        $override = Get-Prop $Step 'override'
+        if (-not [string]::IsNullOrWhiteSpace($override)) {
+            $arguments += @('--override', $override)
+        }
     }
 
     Write-StepLog "> winget $($arguments -join ' ')"
@@ -216,6 +227,16 @@ function Invoke-WingetInstall {
     }
 
     return $LASTEXITCODE
+}
+
+function Invoke-WingetInstall {
+    param($Step)
+    return Invoke-WingetCommand -Action install -Step $Step
+}
+
+function Invoke-WingetUpgrade {
+    param($Step)
+    return Invoke-WingetCommand -Action upgrade -Step $Step
 }
 
 # ---------------------------------------------------------------------------
@@ -290,7 +311,20 @@ function Invoke-JobSteps {
                         $entry.message = 'Cancelled by user.'
                     } else {
                         $entry.exitCode = $exitCode
-                        $verdict = Get-WingetExitMessage -ExitCode $exitCode
+                        $verdict = Get-WingetExitMessage -ExitCode $exitCode -Mode install
+                        $entry.message = $verdict.message
+                        if ($verdict.reboot) { $status.rebootNeeded = $true }
+                        if (-not $verdict.ok) { $failed = $true }
+                    }
+                }
+                'upgrade' {
+                    $exitCode = Invoke-WingetUpgrade -Step $step
+                    if (Test-JobCancelRequested) {
+                        $cancelled = $true
+                        $entry.message = 'Cancelled by user.'
+                    } else {
+                        $entry.exitCode = $exitCode
+                        $verdict = Get-WingetExitMessage -ExitCode $exitCode -Mode upgrade
                         $entry.message = $verdict.message
                         if ($verdict.reboot) { $status.rebootNeeded = $true }
                         if (-not $verdict.ok) { $failed = $true }
